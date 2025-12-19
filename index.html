@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>留声机 Phonograph | Decentralized Web3 Podcast</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: VT323 for pixel look -->
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        void: '#0f0518',
+                        neonPurple: '#8b5cf6',
+                        neonCyan: '#00f3ff',
+                        neonPink: '#ff00ff',
+                        retroGray: '#2d2d2d',
+                        paper: '#f0f0f0',
+                    },
+                    fontFamily: {
+                        pixel: ['"VT323"', 'monospace'],
+                    },
+                    boxShadow: {
+                        'retro': '4px 4px 0px 0px rgba(255, 255, 255, 0.9)',
+                        'retro-purple': '4px 4px 0px 0px #8b5cf6',
+                        'retro-cyan': '4px 4px 0px 0px #00f3ff',
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0f0518;
+            overflow: hidden; /* Prevent body scroll, handle in containers */
+        }
+        
+        /* CRT Scanline Effect */
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                to bottom,
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.1) 50%
+            );
+            background-size: 100% 4px;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f0518;
+            border-left: 1px solid #333;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #8b5cf6;
+            border: 1px solid #fff;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #ff00ff;
+        }
+
+        .text-shadow {
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        /* Glitch Animation */
+        .glitch-hover:hover {
+            animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+            color: #00f3ff;
+        }
+        @keyframes glitch {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+    </style>
+</head>
+<body class="scanlines font-pixel text-gray-200 antialiased selection:bg-neonPink selection:text-white h-screen flex flex-col md:flex-row">
+
+    <!-- Sidebar -->
+    <aside class="w-full md:w-64 border-b-2 md:border-b-0 md:border-r-2 border-white/20 bg-void flex flex-col z-20">
+        <!-- Brand -->
+        <div class="p-6 border-b-2 border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-neonPurple border-2 border-white shadow-retro-cyan flex items-center justify-center">
+                    <i data-lucide="radio" class="text-white w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-wider text-white uppercase" style="text-shadow: 2px 2px #8b5cf6;">留声机</h1>
+                    <span class="text-xs text-neonCyan">PHONOGRAPH V1.0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 p-4 space-y-4">
+            <button onclick="switchView('discovery')" id="nav-discovery" class="w-full text-left p-3 border-2 border-neonCyan bg-neonCyan/10 text-neonCyan shadow-retro-cyan transition-transform active:translate-y-1 active:translate-x-1 flex items-center gap-3">
+                <i data-lucide="radar"></i>
+                <span class="text-xl">发现信号</span>
+            </button>
+            
+            <button onclick="switchView('collection')" id="nav-collection" class="w-full text-left p-3 border-2 border-transparent text-gray-400 hover:text-white hover:border-white/50 transition-all flex items-center gap-3">
+                <i data-lucide="library"></i>
+                <span class="text-xl">我的磁带</span>
+            </button>
+        </nav>
+
+        <!-- Wallet Status -->
+        <div class="p-4 border-t-2 border-white/10">
+            <div class="border-2 border-gray-600 p-2 bg-black/50">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs text-gray-400">STATUS</span>
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                </div>
+                <div class="text-xs font-mono text-neonPurple truncate">0x71C...92F</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative overflow-hidden flex flex-col bg-void">
+        <!-- Header -->
+        <header class="p-6 border-b-2 border-white/10 flex justify-between items-end bg-void z-10">
+            <div>
+                <h2 id="page-title" class="text-4xl text-white mb-1 drop-shadow-[2px_2px_0px_#ff00ff]">LATEST SIGNALS</h2>
+                <p id="page-desc" class="text-gray-500">Decrypting streams from the decentralized web...</p>
+            </div>
+            <div class="hidden md:flex gap-4 text-xs font-mono text-neonCyan">
+                <span>NET: ETH MAINNET</span>
+                <span>BLOCK: 18492021</span>
+            </div>
+        </header>
+
+        <!-- Scrollable Grid Area -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-6">
+            <!-- Content injected by JS -->
+        </div>
+    </main>
+
+    <!-- Player Modal Overlay (Hidden by default) -->
+    <div id="player-modal" class="fixed inset-0 z-50 hidden bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <!-- Cassette Player Container -->
+        <div class="bg-void border-4 border-white shadow-[0_0_50px_rgba(139,92,246,0.3)] max-w-lg w-full relative">
+            
+            <!-- Close Button -->
+            <button onclick="closePlayer()" class="absolute -top-6 -right-6 bg-neonPink text-white border-2 border-white p-2 hover:bg-pink-600 shadow-retro z-50">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+
+            <!-- Player Header -->
+            <div class="bg-neonPurple/20 border-b-4 border-white p-3 flex justify-between items-center">
+                <span class="text-neonPurple animate-pulse text-lg">/// NOW TUNING</span>
+                <span class="text-xs text-gray-400 font-mono">MODEL: SONY-WALKMAN-WEB3</span>
+            </div>
+
+            <div class="p-6">
+                <!-- Cassette Visual -->
+                <div class="bg-[#2a2a2a] border-4 border-[#1a1a1a] rounded-lg p-4 mb-6 relative shadow-inner">
+                    <!-- The Tape -->
+                    <div class="bg-[#e2e2e2] h-48 rounded md:rounded-lg relative border-2 border-black overflow-hidden flex flex-col justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.2)]">
+                        
+                        <!-- Tape Screws -->
+                        <div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-gray-400 border border-black"></div>
+                        <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-gray-400 border border-black"></div>
+                        <div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-gray-400 border border-black"></div>
+                        <div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gray-400 border border-black"></div>
+
+                        <!-- Label Area -->
+                        <div class="absolute top-0 w-full h-8 bg-neonPink/20 border-b border-black/10"></div>
+                        
+                        <!-- Reels Container -->
+                        <div class="px-8 flex justify-between items-center z-10">
+                            <!-- Left Reel -->
+                            <div id="reel-left" class="w-20 h-20 rounded-full border-4 border-white bg-black flex items-center justify-center relative shadow-xl">
+                                <div class="w-full h-1 bg-white/20 absolute transform rotate-45"></div>
+                                <div class="w-full h-1 bg-white/20 absolute transform -rotate-45"></div>
+                                <div class="w-16 h-16 rounded-full border-2 border-dashed border-gray-500"></div>
+                                <div class="w-3 h-3 bg-white rounded-full z-20"></div>
+                            </div>
+
+                            <!-- Window -->
+                            <div class="bg-black/80 w-32 h-14 rounded border-2 border-gray-400 flex flex-col items-center justify-center relative overflow-hidden">
+                                <div class="w-full h-8 flex gap-1 animate-pulse opacity-50">
+                                    <div class="h-full w-full bg-gradient-to-r from-transparent via-gray-800 to-transparent"></div>
+                                </div>
+                                <span id="tape-status" class="text-neonCyan text-[10px] absolute bottom-1">LOCKED</span>
+                            </div>
+
+                            <!-- Right Reel -->
+                            <div id="reel-right" class="w-20 h-20 rounded-full border-4 border-white bg-black flex items-center justify-center relative shadow-xl">
+                                <div class="w-full h-1 bg-white/20 absolute transform rotate-45"></div>
+                                <div class="w-full h-1 bg-white/20 absolute transform -rotate-45"></div>
+                                <div class="w-16 h-16 rounded-full border-2 border-dashed border-gray-500"></div>
+                                <div class="w-3 h-3 bg-white rounded-full z-20"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Title on Tape -->
+                        <div class="mt-4 text-center px-4">
+                            <h3 id="player-title" class="text-black font-bold text-xl truncate font-pixel">Unknown Track</h3>
+                            <p id="player-author" class="text-gray-600 text-sm">Unknown Artist</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="space-y-4">
+                    <!-- Progress Bar -->
+                    <div class="relative w-full h-6 bg-black border-2 border-gray-600">
+                        <div id="progress-bar" class="h-full bg-neonCyan w-0 transition-all duration-300 ease-linear"></div>
+                    </div>
+
+                    <!-- Action Button Area -->
+                    <div id="action-area" class="pt-2">
+                        <!-- Content Injected by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Data ---
+        const PODCASTS = [
+            { id: '1', title: 'Web3 商业思维', author: 'DAO 探索者', price: '0.01', coverId: 10, tags: ['DeFi', 'Biz'] },
+            { id: '2', title: '赛博朋克 2077 沉思录', author: 'Crypto 猎手', price: '0.01', coverId: 28, tags: ['Sci-Fi', 'Talk'] },
+            { id: '3', title: 'NFT 的泡沫与未来', author: '老王侃币', price: '0.02', coverId: 54, tags: ['NFT', 'Art'] },
+            { id: '4', title: '以太坊扩容之路', author: 'Vitalik Fanclub', price: '0.01', coverId: 98, tags: ['Tech', 'ETH'] },
+            { id: '5', title: '元宇宙建筑师日记', author: 'Voxel Master', price: '0.05', coverId: 102, tags: ['Meta', 'Design'] },
+            { id: '6', title: 'Solana 生态大爆发', author: 'Rust 极客', price: '0.01', coverId: 112, tags: ['L1', 'Code'] },
+        ];
+
+        // --- State ---
+        let state = {
+            view: 'discovery',
+            collection: [], // Array of IDs
+            currentPodcast: null,
+            isPlaying: false,
+            playerMode: 'locked' // 'locked', 'playing', 'finished'
+        };
+
+        // --- DOM Elements ---
+        const contentArea = document.getElementById('content-area');
+        const modal = document.getElementById('player-modal');
+        const navDiscovery = document.getElementById('nav-discovery');
+        const navCollection = document.getElementById('nav-collection');
+        const pageTitle = document.getElementById('page-title');
+        
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderView();
+        });
+
+        // --- View Logic ---
+        function switchView(viewName) {
+            state.view = viewName;
+            renderView();
+            updateNavStyles();
+        }
+
+        function updateNavStyles() {
+            const activeClass = "border-neonCyan bg-neonCyan/10 text-neonCyan shadow-retro-cyan";
+            const inactiveClass = "border-transparent text-gray-400 hover:text-white";
+
+            if (state.view === 'discovery') {
+                navDiscovery.className = `w-full text-left p-3 border-2 transition-all flex items-center gap-3 ${activeClass}`;
+                navCollection.className = `w-full text-left p-3 border-2 transition-all flex items-center gap-3 ${inactiveClass}`;
+                pageTitle.innerText = "LATEST SIGNALS";
+            } else {
+                navDiscovery.className = `w-full text-left p-3 border-2 transition-all flex items-center gap-3 ${inactiveClass}`;
+                navCollection.className = `w-full text-left p-3 border-2 transition-all flex items-center gap-3 border-neonPink bg-neonPink/10 text-neonPink shadow-retro-purple`; // Custom pink style for collection
+                pageTitle.innerText = "MY VAULT";
+            }
+        }
+
+        function renderView() {
+            contentArea.innerHTML = '';
+            
+            const data = state.view === 'discovery' 
+                ? PODCASTS 
+                : PODCASTS.filter(p => state.collection.includes(p.id));
+
+            if (data.length === 0) {
+                contentArea.innerHTML = `
+                    <div class="h-64 flex flex-col items-center justify-center text-gray-500 border-2 border-dashed border-gray-700">
+                        <i data-lucide="ghost" class="w-12 h-12 mb-4 animate-bounce"></i>
+                        <p class="text-xl">NO SIGNALS FOUND</p>
+                    </div>
+                `;
+            } else {
+                const grid = document.createElement('div');
+                grid.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
+                
+                data.forEach(podcast => {
+                    const isOwned = state.collection.includes(podcast.id);
+                    const card = document.createElement('div');
+                    card.className = "group bg-void border-2 border-white hover:border-neonPurple transition-all cursor-pointer relative shadow-[4px_4px_0px_0px_#2d2d2d] hover:shadow-retro-purple active:translate-y-1 active:translate-x-1 active:shadow-none";
+                    card.onclick = () => openPlayer(podcast);
+
+                    card.innerHTML = `
+                        <div class="aspect-square relative overflow-hidden border-b-2 border-white">
+                            <img src="https://picsum.photos/id/${podcast.coverId}/400/400" class="w-full h-full object-cover filter grayscale contrast-125 group-hover:grayscale-0 transition-all duration-500">
+                            ${!isOwned ? `
+                            <div class="absolute top-2 right-2 bg-black border border-neonCyan text-neonCyan px-2 py-1 text-xs font-bold shadow-[2px_2px_0px_0px_#00f3ff]">
+                                <i data-lucide="lock" class="w-3 h-3 inline mr-1"></i>${podcast.price} U
+                            </div>` : `
+                            <div class="absolute top-2 right-2 bg-neonPink border border-white text-white px-2 py-1 text-xs font-bold shadow-[2px_2px_0px_0px_#fff]">
+                                <i data-lucide="check" class="w-3 h-3 inline mr-1"></i>OWNED
+                            </div>`}
+                        </div>
+                        <div class="p-4">
+                            <h3 class="text-xl leading-tight mb-2 group-hover:text-neonPurple truncate">${podcast.title}</h3>
+                            <p class="text-sm text-gray-400 mb-3">@${podcast.author}</p>
+                            <div class="flex gap-2">
+                                ${podcast.tags.map(tag => `<span class="text-[10px] border border-gray-600 px-1 text-gray-400">#${tag}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+                contentArea.appendChild(grid);
+            }
+            lucide.createIcons();
+        }
+
+        // --- Player Logic ---
+        let progressInterval;
+
+        function openPlayer(podcast) {
+            state.currentPodcast = podcast;
+            const isOwned = state.collection.includes(podcast.id);
+            state.playerMode = isOwned ? 'paused' : 'locked'; // If owned, start ready to play
+            state.isPlaying = false;
+            
+            // Update UI
+            document.getElementById('player-title').innerText = podcast.title;
+            document.getElementById('player-author').innerText = podcast.author;
+            document.getElementById('progress-bar').style.width = '0%';
+            
+            modal.classList.remove('hidden');
+            renderPlayerControls();
+        }
+
+        function closePlayer() {
+            modal.classList.add('hidden');
+            stopPlayback();
+            state.currentPodcast = null;
+        }
+
+        function renderPlayerControls() {
+            const area = document.getElementById('action-area');
+            const tapeStatus = document.getElementById('tape-status');
+            const leftReel = document.getElementById('reel-left');
+            const rightReel = document.getElementById('reel-right');
+
+            // Reset animations
+            leftReel.classList.remove('animate-spin-slow');
+            rightReel.classList.remove('animate-spin-slow');
+
+            if (state.isPlaying) {
+                leftReel.classList.add('animate-spin-slow');
+                rightReel.classList.add('animate-spin-slow');
+            }
+
+            if (state.playerMode === 'locked') {
+                tapeStatus.innerText = "LOCKED";
+                tapeStatus.className = "text-red-500 text-[10px] absolute bottom-1 animate-pulse";
+                
+                area.innerHTML = `
+                    <button onclick="unlockPodcast()" class="w-full py-3 bg-neonCyan text-black font-bold text-xl border-2 border-white shadow-retro hover:bg-cyan-300 active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2">
+                        <i data-lucide="zap"></i> 投入 ${state.currentPodcast.price} U 解锁
+                    </button>
+                    <p class="text-center text-xs text-gray-500 mt-2">NEED WALLET SIGNATURE</p>
+                `;
+            } else if (state.playerMode === 'playing' || state.playerMode === 'paused') {
+                tapeStatus.innerText = state.isPlaying ? "PLAYING..." : "READY";
+                tapeStatus.className = "text-neonGreen text-[10px] absolute bottom-1";
+                
+                area.innerHTML = `
+                    <div class="flex gap-4">
+                        <button onclick="togglePlay()" class="flex-1 py-3 bg-neonPurple text-white font-bold text-xl border-2 border-white shadow-retro hover:bg-purple-600 active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2">
+                            <i data-lucide="${state.isPlaying ? 'pause' : 'play'}"></i>
+                            ${state.isPlaying ? 'PAUSE' : 'PLAY TAPE'}
+                        </button>
+                    </div>
+                `;
+            } else if (state.playerMode === 'finished') {
+                tapeStatus.innerText = "END OF TAPE";
+                tapeStatus.className = "text-neonPink text-[10px] absolute bottom-1";
+
+                const isAlreadyCollected = state.collection.includes(state.currentPodcast.id);
+
+                if (isAlreadyCollected) {
+                     area.innerHTML = `
+                        <button onclick="togglePlay()" class="w-full py-3 bg-white text-black font-bold text-xl border-2 border-gray-400 shadow-retro hover:bg-gray-200 active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2">
+                            <i data-lucide="rotate-ccw"></i> REWIND
+                        </button>
+                    `;
+                } else {
+                    area.innerHTML = `
+                        <button onclick="mintNFT()" class="w-full py-3 bg-neonPink text-white font-bold text-xl border-2 border-white shadow-retro hover:bg-pink-600 active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2">
+                            <i data-lucide="disc"></i> 铸造磁带 NFT
+                        </button>
+                        <p class="text-center text-xs text-neonPink mt-2 animate-pulse">>>> TAPE FINISHED. MINT TO COLLECT.</p>
+                    `;
+                }
+            }
+            lucide.createIcons();
+        }
+
+        function unlockPodcast() {
+            const btn = document.querySelector('#action-area button');
+            btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin"></i> PROCESSING...`;
+            btn.disabled = true;
+            lucide.createIcons();
+
+            setTimeout(() => {
+                state.playerMode = 'paused';
+                state.isPlaying = true; // Auto play after unlock
+                startPlayback();
+                renderPlayerControls();
+            }, 1500);
+        }
+
+        function togglePlay() {
+            if (state.playerMode === 'finished') {
+                // Rewind logic
+                state.playerMode = 'paused';
+                document.getElementById('progress-bar').style.width = '0%';
+                togglePlay(); // start playing
+                return;
+            }
+
+            state.isPlaying = !state.isPlaying;
+            if (state.isPlaying) {
+                startPlayback();
+            } else {
+                stopPlayback();
+            }
+            renderPlayerControls();
+        }
+
+        function startPlayback() {
+            state.playerMode = 'playing';
+            let width = parseFloat(document.getElementById('progress-bar').style.width) || 0;
+            
+            clearInterval(progressInterval);
+            progressInterval = setInterval(() => {
+                if (width >= 100) {
+                    stopPlayback();
+                    state.playerMode = 'finished';
+                    state.isPlaying = false;
+                    renderPlayerControls();
+                } else {
+                    width += 0.5; // Speed of playback
+                    document.getElementById('progress-bar').style.width = width + '%';
+                }
+            }, 50);
+        }
+
+        function stopPlayback() {
+            clearInterval(progressInterval);
+        }
+
+        function mintNFT() {
+            const btn = document.querySelector('#action-area button');
+            btn.innerHTML = `<i data-lucide="hammer" class="animate-bounce"></i> MINTING...`;
+            btn.disabled = true;
+            lucide.createIcons();
+
+            setTimeout(() => {
+                if (!state.collection.includes(state.currentPodcast.id)) {
+                    state.collection.push(state.currentPodcast.id);
+                }
+                alert(`SUCCESS! Tape "${state.currentPodcast.title}" added to Vault.`);
+                closePlayer();
+                renderView(); // Refresh grids
+            }, 2000);
+        }
+
+    </script>
+</body>
+</html>
