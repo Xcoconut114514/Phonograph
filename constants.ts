@@ -17,7 +17,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 45, 
     coverUrl: getCover('abstract geometric nodes network blue gold'), 
     avatarUrl: getAvatar('dao_explorer'),
-    tags: ['DeFi', 'Business'] 
+    tags: ['DeFi', '商业'] 
   },
   { 
     id: '2', 
@@ -29,7 +29,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 32, 
     coverUrl: getCover('neon city rainy night street cyber'), 
     avatarUrl: getAvatar('night_city'),
-    tags: ['Sci-Fi', 'Talk'] 
+    tags: ['科幻', '杂谈'] 
   },
   { 
     id: '3', 
@@ -41,7 +41,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 58, 
     coverUrl: getCover('colorful 3d pixel art glitched monkey'), 
     avatarUrl: getAvatar('crypto_punk'),
-    tags: ['NFT', 'Trend'] 
+    tags: ['NFT', '趋势'] 
   },
   { 
     id: '4', 
@@ -53,7 +53,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 65, 
     coverUrl: getCover('ethereum crystal diamond futuristic technology glowing'), 
     avatarUrl: getAvatar('vitalik_fan'),
-    tags: ['Tech', 'L2'] 
+    tags: ['技术', 'L2'] 
   },
   { 
     id: '5', 
@@ -65,7 +65,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 25, 
     coverUrl: getCover('virtual reality digital architecture grid neon purple'), 
     avatarUrl: getAvatar('voxel_builder'),
-    tags: ['Metaverse', 'Design'] 
+    tags: ['元宇宙', '设计'] 
   },
   { 
     id: '6', 
@@ -77,6 +77,6 @@ export const MOCK_PODCASTS: Podcast[] = [
     duration: 40, 
     coverUrl: getCover('fast speed light streak green purple cyber'), 
     avatarUrl: getAvatar('rust_geek'),
-    tags: ['L1', 'Code'] 
+    tags: ['公链', '代码'] 
   },
 ];

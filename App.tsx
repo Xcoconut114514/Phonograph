@@ -70,7 +70,7 @@ const LogoWidget: React.FC = () => {
               PHONO<span className="text-neonCyan">GRAPH</span>
             </h1>
             <div className="flex items-center gap-1 mt-1">
-               <div className="text-[10px] text-gray-400 font-pixel">AUDIO PROTOCOL</div>
+               <div className="text-[10px] text-gray-400 font-pixel">去中心化音频协议</div>
                {/* Equalizer Animation */}
                <div className="flex items-end gap-[2px] h-4 ml-2">
                   <div className="bar bg-neonPurple"></div>
@@ -121,7 +121,7 @@ const PodcastCard: React.FC<{ data: Podcast; onClick: () => void }> = ({ data, o
           
           <div className="p-4 bg-void relative">
             <div className="flex justify-between items-center mb-2">
-               <div className="text-xs text-neonPurple font-mono">ENCRYPTED TAPE</div>
+               <div className="text-xs text-neonPurple font-mono">加密数字磁带</div>
                <div className="flex items-center gap-1 text-gray-500">
                   <Headphones size={12} /> <span className="text-xs font-pixel">{data.listens}</span>
                </div>
@@ -143,10 +143,10 @@ const PodcastCard: React.FC<{ data: Podcast; onClick: () => void }> = ({ data, o
               </div>
               
               <h4 className="text-neonCyan font-header text-lg mb-1">@{data.author}</h4>
-              <p className="text-gray-400 text-xs font-pixel mb-6">Web3 Content Creator</p>
+              <p className="text-gray-400 text-xs font-pixel mb-6">Web3 内容创作者</p>
               
               <button className="px-6 py-2 bg-neonCyan text-black font-bold font-header hover:bg-white transition-colors flex items-center gap-2 mx-auto">
-                 <Play size={16} fill="black" /> LISTEN NOW
+                 <Play size={16} fill="black" /> 立即收听
               </button>
            </div>
         </div>
@@ -213,7 +213,7 @@ const PlayerModal: React.FC<PlayerProps> = ({ podcast, onClose, addToCollection,
         <div className="flex justify-between items-center bg-black p-3 mb-1 border-b border-neonPurple/30">
           <div className="flex items-center gap-2">
              <Activity className="text-neonPurple animate-pulse" size={16} />
-             <span className="text-neonPurple font-pixel tracking-widest text-sm">NOW PLAYING PROTOCOL</span>
+             <span className="text-neonPurple font-pixel tracking-widest text-sm">正在播放协议</span>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
             <X size={20} />
@@ -245,7 +245,7 @@ const PlayerModal: React.FC<PlayerProps> = ({ podcast, onClose, addToCollection,
                   {/* Window */}
                   <div className="bg-black/80 border border-gray-500 w-24 h-8 rounded-sm flex items-center justify-center px-1">
                       {playerState === 'locked' ? (
-                          <span className="text-neonPink font-pixel text-[10px] animate-pulse">LOCKED</span>
+                          <span className="text-neonPink font-pixel text-[10px] animate-pulse">已锁定</span>
                       ) : (
                           <div className="w-full flex gap-[2px]">
                               <div className={`h-full w-full bg-white/20 ${playerState === 'playing' ? 'animate-pulse' : ''}`}></div>
@@ -261,7 +261,7 @@ const PlayerModal: React.FC<PlayerProps> = ({ podcast, onClose, addToCollection,
             </div>
             <div className="mt-2 text-center">
                <h3 className="text-white font-header text-sm tracking-wide">{podcast.title}</h3>
-               <p className="text-[10px] text-gray-500 font-mono">DOLBY NR [ON]</p>
+               <p className="text-[10px] text-gray-500 font-mono">杜比降噪 [开启]</p>
             </div>
           </div>
 
@@ -279,11 +279,11 @@ const PlayerModal: React.FC<PlayerProps> = ({ podcast, onClose, addToCollection,
             <div className="flex justify-center gap-6">
               {playerState === 'locked' ? (
                 <PixelButton onClick={handleUnlock} variant="secondary" className="w-full">
-                   <Zap size={16} /> UNLOCK ({podcast.price} ETH)
+                   <Zap size={16} /> 解锁 ({podcast.price} ETH)
                 </PixelButton>
               ) : playerState === 'finished' ? (
                 <PixelButton onClick={handleMint} variant="primary" className="w-full">
-                   <Disc size={16} /> COLLECT TO MUSEUM
+                   <Disc size={16} /> 收藏至博物馆
                 </PixelButton>
               ) : (
                 <div className="flex gap-4 w-full">
@@ -324,7 +324,7 @@ const Museum: React.FC<{ collectedIds: string[]; allPodcasts: Podcast[]; onPlay:
                     <div className="w-2 h-2 bg-white animate-[pixel-jump_1s_ease-in-out_infinite_0.8s]"></div>
                  </div>
              </div>
-             <p className="text-gray-500 font-pixel">GO DISCOVER AND COLLECT SOME TAPES</p>
+             <p className="text-gray-500 font-pixel">前往发现频道收集您的第一张磁带</p>
          </div>
       </div>
     );
@@ -348,8 +348,8 @@ const Museum: React.FC<{ collectedIds: string[]; allPodcasts: Podcast[]; onPlay:
                 {tape.title}
               </h3>
               <div className="relative z-10 flex justify-between items-end font-mono text-[10px] font-bold">
-                <span className="bg-black text-white px-1">SIDE A</span>
-                <span>{tape.duration} MIN</span>
+                <span className="bg-black text-white px-1">A面</span>
+                <span>{tape.duration} 分钟</span>
               </div>
            </div>
         </div>
@@ -386,7 +386,7 @@ const App: React.FC = () => {
             className={`group w-full text-left px-4 py-4 font-header text-sm tracking-wider border transition-all flex items-center gap-4 ${view === 'discovery' ? 'bg-neonCyan/10 border-neonCyan text-neonCyan shadow-[0_0_15px_rgba(0,243,255,0.2)]' : 'border-transparent text-gray-500 hover:text-white hover:border-gray-700'}`}
           >
             <Radio size={20} className="group-hover:animate-bounce" /> 
-            <span>DISCOVERY</span>
+            <span>发现信号</span>
           </button>
           
           <button 
@@ -394,18 +394,18 @@ const App: React.FC = () => {
             className={`group w-full text-left px-4 py-4 font-header text-sm tracking-wider border transition-all flex items-center gap-4 ${view === 'collection' ? 'bg-neonPink/10 border-neonPink text-neonPink shadow-[0_0_15px_rgba(255,0,60,0.2)]' : 'border-transparent text-gray-500 hover:text-white hover:border-gray-700'}`}
           >
             <Landmark size={20} className="group-hover:animate-bounce" /> 
-            <span>MUSEUM</span>
+            <span>我的藏品</span>
           </button>
         </nav>
 
         <div className="mt-auto pt-6 border-t border-dashed border-gray-800 relative z-20">
           {!isWalletConnected ? (
             <PixelButton onClick={() => setIsWalletConnected(true)} variant="primary" className="w-full text-sm">
-               <Wallet size={16} /> CONNECT WALLET
+               <Wallet size={16} /> 连接钱包
             </PixelButton>
           ) : (
              <div className="border border-neonCyan/50 bg-black/50 p-3 text-center backdrop-blur-md">
-               <p className="text-neonCyan text-[10px] font-pixel mb-1 tracking-widest">NET: ETHEREUM</p>
+               <p className="text-neonCyan text-[10px] font-pixel mb-1 tracking-widest">网络: 以太坊</p>
                <p className="text-white text-xs font-mono truncate">0x71C...92F</p>
              </div>
           )}
@@ -422,14 +422,14 @@ const App: React.FC = () => {
               {view === 'discovery' ? (
                 <>最新电台 /// <span className="text-neonCyan animate-pulse">X402</span></>
               ) : (
-                '留声博物馆 /// MUSEUM'
+                '留声博物馆 /// 馆藏'
               )}
             </h2>
             <div className="h-1 w-20 bg-neonPurple"></div>
           </div>
           <div className="hidden md:flex items-center gap-2 text-[10px] text-gray-500 font-mono border border-gray-800 px-3 py-1 rounded-full">
              <div className="w-2 h-2 rounded-full bg-neonGreen animate-pulse bg-green-500"></div>
-             <span>SYSTEM OPTIMAL</span>
+             <span>系统运行正常</span>
           </div>
         </header>
 
