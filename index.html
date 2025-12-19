@@ -26,6 +26,7 @@
             animation: {
               'spin-slow': 'spin 4s linear infinite',
               'bounce-slow': 'bounce 2s infinite',
+              'pulse-slow': 'pulse-slow 2s ease-in-out infinite',
             },
             backgroundImage: {
                'grid-pattern': "linear-gradient(to right, #1f1f1f 1px, transparent 1px), linear-gradient(to bottom, #1f1f1f 1px, transparent 1px)",
@@ -36,6 +37,15 @@
     </script>
     <style>
       body { background-color: #05010a; }
+      
+      /* Slow pulse animation for NFT馆藏 */
+      @keyframes pulse-slow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .animate-pulse-slow {
+        animation: pulse-slow 2s ease-in-out infinite;
+      }
       
       /* CRT Scanlines Effect */
       .scanlines {

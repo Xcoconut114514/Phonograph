@@ -1179,7 +1179,7 @@ const App: React.FC = () => {
               {view === 'discovery' ? (
                 <>最新电台 /// <span className="text-neonCyan animate-pulse">X402</span></>
               ) : (
-                '留声博物馆 /// 馆藏'
+                <>留声博物馆 /// <span className="text-red-500 animate-pulse-slow drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">NFT馆藏</span></>
               )}
             </h2>
             <div className="h-1 w-20 bg-neonPurple"></div>
