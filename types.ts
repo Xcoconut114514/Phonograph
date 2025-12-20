@@ -21,6 +21,7 @@ export interface Podcast {
   basePrice: number; // Per paid episode price (0.01 USDC)
   minTipAmount?: number; // Minimum tip amount for private message (USDC)
   tipEnabled?: boolean; // Whether tipping/messaging is enabled
+  creatorAddress: `0x${string}`; // x402 payment recipient address
 }
 
 // Message sent via tipping

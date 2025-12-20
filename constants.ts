@@ -475,6 +475,16 @@ Superchain 的愿景是让 Layer 2 像互联网一样互联互通。我们现在
 // 导出 MOCK_PODCASTS
 // ========================================
 
+// 创作者收款地址（示例地址，Base Sepolia 测试网）
+const CREATOR_ADDRESSES = {
+  vitalik: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e' as `0x${string}`,
+  a16z: '0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199' as `0x${string}`,
+  ethFoundation: '0xdD2FD4581271e230360230F9337D5c0430Bf44C0' as `0x${string}`,
+  bankless: '0xbDA5747bFD65F08deb54cb465eB87D40e51B197E' as `0x${string}`,
+  chainlink: '0xFABB0ac9d68B0B445fB7357272Ff202C5651694a' as `0x${string}`,
+  base: '0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec' as `0x${string}`,
+} as const;
+
 export const MOCK_PODCASTS: Podcast[] = [
   {
     id: 'vitalik-blog',
@@ -490,6 +500,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 2,
+    creatorAddress: CREATOR_ADDRESSES.vitalik,
   },
   {
     id: 'a16z-crypto',
@@ -505,6 +516,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 1,
+    creatorAddress: CREATOR_ADDRESSES.a16z,
   },
   {
     id: 'ethereum-foundation',
@@ -520,6 +532,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 1,
+    creatorAddress: CREATOR_ADDRESSES.ethFoundation,
   },
   {
     id: 'bankless',
@@ -535,6 +548,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 1,
+    creatorAddress: CREATOR_ADDRESSES.bankless,
   },
   {
     id: 'chainlink-research',
@@ -550,6 +564,7 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 1,
+    creatorAddress: CREATOR_ADDRESSES.chainlink,
   },
   {
     id: 'base-ecosystem',
@@ -565,5 +580,6 @@ export const MOCK_PODCASTS: Podcast[] = [
     basePrice: 0.01,
     tipEnabled: true,
     minTipAmount: 1,
+    creatorAddress: CREATOR_ADDRESSES.base,
   },
 ];
