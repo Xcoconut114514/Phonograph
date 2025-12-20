@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAccount, useChainId, useWalletClient } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
-import { useX402Payment, formatUSDC } from './useX402Payment';
 import { 
   Play, 
   Pause, 
@@ -2056,9 +2055,6 @@ const App: React.FC = () => {
   const isCorrectNetwork = chainId === baseSepolia.id;
   const isWalletConnected = isConnected && isCorrectNetwork;
   
-  // x402 支付 Hook
-  const { payForContent, status: x402Status, error: x402Error, reset: resetX402 } = useX402Payment();
-  
   // 钱包弹窗状态
   const [showWalletModal, setShowWalletModal] = useState(false);
   
@@ -2088,78 +2084,38 @@ const App: React.FC = () => {
 
   // -- Actions --
 
-  // 使用 x402 协议解锁单集
-  const handleUnlockEpisode = async (epId: string, price: number) => {
+  const handleUnlockEpisode = (epId: string, price: number) => {
     if (!isWalletConnected) {
       setShowWalletModal(true);
       return;
     }
-    
-    // 获取对应的播客信息
-    const podcast = MOCK_PODCASTS.find(p => p.episodes.some(e => e.id === epId));
-    const episode = podcast?.episodes.find(e => e.id === epId);
-    
-    console.log(`[x402] 发起解锁请求: ${episode?.title || epId}, 价格: ${price} USDC`);
-    
-    // 使用 x402 协议发起支付
-    const result = await payForContent(
-      epId,
-      price,
-      podcast?.creatorAddress,
-      `解锁播客单集: ${episode?.title || epId}`
-    );
-    
-    if (result.success) {
-      // 播放解锁音效 🎵
-      playUnlockSound();
-      // 显示支付成功提示
-      setQuickPayment({
-        message: `✓ x402 支付成功 · ${price} USDC`,
-        onComplete: () => setUnlockedItems(prev => [...prev, epId])
-      });
-      console.log(`[x402] 解锁成功! TX: ${result.txHash}`);
-    } else {
-      // 支付失败
-      console.error(`[x402] 支付失败:`, result.error);
-      // 可以显示错误提示
-    }
+    // 播放解锁音效 🎵
+    playUnlockSound();
+    // X402 即时支付 - 快速反馈
+    setQuickPayment({
+      message: `已解锁单集 · ${price} USDC`,
+      onComplete: () => setUnlockedItems(prev => [...prev, epId])
+    });
   };
 
-  // 使用 x402 协议解锁整套播客
-  const handleUnlockBundle = async (podcast: Podcast) => {
+  const handleUnlockBundle = (podcast: Podcast) => {
     if (!isWalletConnected) {
       setShowWalletModal(true);
       return;
     }
     const paidEps = podcast.episodes.filter(e => !e.isFree);
     const remainingPaidEps = paidEps.filter(e => !unlockedItems.includes(e.id));
-    const bundlePrice = Number((remainingPaidEps.length * podcast.basePrice * 0.9).toFixed(6));
-    
-    console.log(`[x402] 发起套餐解锁请求: ${podcast.title}, 价格: ${bundlePrice} USDC`);
-    
-    // 使用 x402 协议发起支付
-    const result = await payForContent(
-      `bundle-${podcast.id}`,
-      bundlePrice,
-      podcast.creatorAddress,
-      `解锁播客全集: ${podcast.title}`
-    );
-    
-    if (result.success) {
-      // 播放解锁音效 🎵
-      playUnlockSound();
-      // X402 即时支付 - 快速反馈
-      setQuickPayment({
-        message: `✓ x402 支付成功 · 已解锁『${podcast.title}』${remainingPaidEps.length === paidEps.length ? '全集' : `剩余${remainingPaidEps.length}集`} · ${bundlePrice} USDC`,
-        onComplete: () => {
-          const newIds = remainingPaidEps.map(e => e.id);
-          setUnlockedItems(prev => [...new Set([...prev, ...newIds])]);
-        }
-      });
-      console.log(`[x402] 套餐解锁成功! TX: ${result.txHash}`);
-    } else {
-      console.error(`[x402] 套餐支付失败:`, result.error);
-    }
+    const bundlePrice = (remainingPaidEps.length * podcast.basePrice * 0.9).toFixed(3);
+    // 播放解锁音效 🎵
+    playUnlockSound();
+    // X402 即时支付 - 快速反馈
+    setQuickPayment({
+      message: `已解锁『${podcast.title}』${remainingPaidEps.length === paidEps.length ? '全集' : `剩余${remainingPaidEps.length}集`} · ${bundlePrice} USDC`,
+      onComplete: () => {
+        const newIds = remainingPaidEps.map(e => e.id);
+        setUnlockedItems(prev => [...new Set([...prev, ...newIds])]);
+      }
+    });
   };
 
   const handleMintNFT = (podcastId: string) => {
