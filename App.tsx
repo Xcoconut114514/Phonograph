@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
 import { 
@@ -68,6 +68,182 @@ const Tag: React.FC<{ label: string }> = ({ label }) => (
     #{label}
   </span>
 );
+
+// --- 投币音效 (Arcade Coin Drop Sound) ---
+const playCoinSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // 创建多层次的投币音效
+    const playTone = (freq: number, startTime: number, duration: number, gain: number) => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + startTime);
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + startTime);
+      gainNode.gain.linearRampToValueAtTime(gain, audioContext.currentTime + startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + startTime + duration);
+      
+      oscillator.start(audioContext.currentTime + startTime);
+      oscillator.stop(audioContext.currentTime + startTime + duration);
+    };
+    
+    // 硬币落入音效序列 (经典街机风格)
+    playTone(1800, 0, 0.08, 0.3);      // 高音起始
+    playTone(1400, 0.05, 0.08, 0.25);  // 快速下降
+    playTone(1000, 0.10, 0.10, 0.3);   // 中音
+    playTone(800, 0.15, 0.12, 0.25);   // 继续下降
+    playTone(600, 0.22, 0.15, 0.3);    // 低音落底
+    playTone(900, 0.30, 0.20, 0.2);    // 回弹音
+    playTone(1200, 0.35, 0.25, 0.15);  // 结束闪光音
+    
+    // 添加金属碰撞的噪音效果
+    const noise = audioContext.createBufferSource();
+    const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.1, audioContext.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i++) {
+      noiseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / noiseData.length, 2);
+    }
+    noise.buffer = noiseBuffer;
+    
+    const noiseGain = audioContext.createGain();
+    const noiseFilter = audioContext.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 3000;
+    
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(audioContext.destination);
+    noiseGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+    
+    noise.start();
+    noise.stop(audioContext.currentTime + 0.1);
+    
+  } catch (e) {
+    console.log('Audio not supported');
+  }
+};
+
+// --- 购买解锁音效 (Arcade Unlock/Power-Up Sound) ---
+const playUnlockSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // 创建音调上升的解锁音效
+    const playTone = (freq: number, startTime: number, duration: number, gain: number, type: OscillatorType = 'sine') => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + startTime);
+      oscillator.type = type;
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + startTime);
+      gainNode.gain.linearRampToValueAtTime(gain, audioContext.currentTime + startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + startTime + duration);
+      
+      oscillator.start(audioContext.currentTime + startTime);
+      oscillator.stop(audioContext.currentTime + startTime + duration);
+    };
+    
+    // 音调上升的解锁序列 (经典 Power-Up 风格) - 与投币相反
+    playTone(400, 0, 0.08, 0.25);       // 低音起始
+    playTone(600, 0.06, 0.08, 0.3);     // 快速上升
+    playTone(800, 0.12, 0.08, 0.3);     // 继续上升
+    playTone(1000, 0.18, 0.10, 0.3);    // 中音
+    playTone(1300, 0.25, 0.12, 0.35);   // 高音
+    playTone(1600, 0.32, 0.15, 0.3);    // 更高
+    playTone(2000, 0.40, 0.25, 0.25);   // 最高点闪光音
+    
+    // 添加成功的"叮"声
+    playTone(2400, 0.50, 0.3, 0.2, 'triangle');  // 清脆的结束音
+    playTone(2400, 0.55, 0.25, 0.15, 'triangle'); // 回响
+    
+    // 添加闪光效果的高频噪音
+    const noise = audioContext.createBufferSource();
+    const noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.08, audioContext.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseData.length; i++) {
+      noiseData[i] = (Math.random() * 2 - 1) * Math.pow(i / noiseData.length, 0.5) * Math.pow(1 - i / noiseData.length, 2);
+    }
+    noise.buffer = noiseBuffer;
+    
+    const noiseGain = audioContext.createGain();
+    const noiseFilter = audioContext.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 5000;
+    
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(audioContext.destination);
+    noiseGain.gain.setValueAtTime(0.05, audioContext.currentTime + 0.4);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+    
+    noise.start(audioContext.currentTime + 0.4);
+    noise.stop(audioContext.currentTime + 0.5);
+    
+  } catch (e) {
+    console.log('Audio not supported');
+  }
+};
+
+// 铸造成功音效 - 史诗级庆祝音 🎊
+const playMintSuccessSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    const playTone = (freq: number, startTime: number, duration: number, gain: number, type: OscillatorType = 'sine') => {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(freq, audioContext.currentTime + startTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime + startTime);
+      gainNode.gain.linearRampToValueAtTime(gain, audioContext.currentTime + startTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + startTime + duration);
+      oscillator.start(audioContext.currentTime + startTime);
+      oscillator.stop(audioContext.currentTime + startTime + duration);
+    };
+    
+    // 胜利号角序列 - 庄严的成功感
+    // 低音基础和弦
+    playTone(220, 0, 0.4, 0.15);      // A3
+    playTone(277, 0, 0.4, 0.12);      // C#4
+    playTone(330, 0, 0.4, 0.12);      // E4
+    
+    // 上升琶音
+    playTone(440, 0.1, 0.15, 0.25);   // A4
+    playTone(554, 0.18, 0.15, 0.25);  // C#5
+    playTone(659, 0.26, 0.15, 0.28);  // E5
+    playTone(880, 0.34, 0.2, 0.3);    // A5 - 高潮
+    
+    // 闪亮的结束音
+    playTone(1760, 0.45, 0.5, 0.2, 'triangle');  // A6 - 闪光
+    playTone(2200, 0.5, 0.4, 0.15, 'triangle');  // 更高的泛音
+    playTone(1320, 0.55, 0.3, 0.12, 'triangle'); // 和声
+    
+    // 魔法闪烁效果
+    for (let i = 0; i < 6; i++) {
+      playTone(3000 + i * 200, 0.6 + i * 0.05, 0.08, 0.08, 'sine');
+    }
+    
+    // 低音共鸣收尾
+    playTone(110, 0.7, 0.8, 0.1);
+    playTone(220, 0.7, 0.6, 0.08);
+    
+  } catch (e) {
+    console.log('Audio not supported');
+  }
+};
 
 // --- Quick Payment Toast (X402 即时支付反馈) ---
 
@@ -150,7 +326,10 @@ const CodeRain: React.FC = () => {
 const TransactionModal: React.FC<{ 
   onComplete: () => void; 
   title: string;
-}> = ({ onComplete, title }) => {
+  txHash?: `0x${string}`;
+  txStatus?: 'pending' | 'confirming' | 'success' | 'error';
+  txError?: string;
+}> = ({ onComplete, title, txHash, txStatus = 'pending', txError }) => {
   const [step, setStep] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
@@ -179,9 +358,17 @@ const TransactionModal: React.FC<{
     return () => clearInterval(interval);
   }, [step]);
 
-  // Log Simulation
+  // Log Simulation - 现在会根据真实交易状态更新
   useEffect(() => {
-    const codeLines = [
+    const realTxLines = txHash ? [
+      "初始化链接中...",
+      "验证签名...",
+      `连接 Base Sepolia 测试网...`,
+      `交易已提交: ${txHash.slice(0, 10)}...${txHash.slice(-6)}`,
+      "等待区块确认...",
+      "生成 NFT 元数据...",
+      "写入区块链...",
+    ] : [
       "初始化链接中...",
       "验证签名 0x89A...",
       "连接主网...",
@@ -198,27 +385,50 @@ const TransactionModal: React.FC<{
     
     let lineIndex = 0;
     const logInterval = setInterval(() => {
-      if (lineIndex < codeLines.length && step < 3) {
-        const hex = Math.random().toString(16).substr(2, 6).toUpperCase();
-        setLogs(prev => [`> [${hex}] ${codeLines[lineIndex]}`, ...prev].slice(0, 7));
+      if (lineIndex < realTxLines.length && step < 3) {
+        const hex = txHash ? txHash.slice(2, 8).toUpperCase() : Math.random().toString(16).substr(2, 6).toUpperCase();
+        setLogs(prev => [`> [${hex}] ${realTxLines[lineIndex]}`, ...prev].slice(0, 7));
         lineIndex++;
       }
     }, 350);
 
-    const s1 = setTimeout(() => setStep(1), 1500); // Init
-    const s2 = setTimeout(() => setStep(2), 3500); // Building
-    const s3 = setTimeout(() => { 
-      setStep(3); 
-      setProgress(100); 
+    // 根据真实交易状态更新步骤
+    if (txStatus === 'success') {
+      setStep(3);
+      setProgress(100);
       setShowParticles(true);
-    }, 5000); // Done
-    const s4 = setTimeout(onComplete, 7000); // Close (extended for effect)
+      const completeTimer = setTimeout(onComplete, 2000);
+      return () => {
+        clearInterval(logInterval);
+        clearTimeout(completeTimer);
+      };
+    } else if (txStatus === 'error') {
+      setStep(4); // Error state
+      setProgress(0);
+      return () => clearInterval(logInterval);
+    } else if (txStatus === 'confirming') {
+      setStep(2);
+      setProgress(75);
+    } else {
+      // 模拟模式（无真实交易时）
+      const s1 = setTimeout(() => setStep(1), 1500);
+      const s2 = setTimeout(() => setStep(2), 3500);
+      const s3 = setTimeout(() => { 
+        setStep(3); 
+        setProgress(100); 
+        setShowParticles(true);
+        playMintSuccessSound(); // 播放成功音效 🎉
+      }, 5000);
+      const s4 = setTimeout(onComplete, 7000);
 
-    return () => {
-      [s1, s2, s3, s4].forEach(clearTimeout);
-      clearInterval(logInterval);
-    };
-  }, [onComplete]);
+      return () => {
+        [s1, s2, s3, s4].forEach(clearTimeout);
+        clearInterval(logInterval);
+      };
+    }
+
+    return () => clearInterval(logInterval);
+  }, [onComplete, txHash, txStatus]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md font-mono perspective-1000">
@@ -264,6 +474,47 @@ const TransactionModal: React.FC<{
                {showParticles && Array.from({ length: 20 }, (_, i) => (
                  <Particle key={i} delay={i * 50} index={i} />
                ))}
+               
+               {/* 成功时的烟花效果 🎆 */}
+               {step === 3 && (
+                 <>
+                   {/* 彩色烟花粒子 */}
+                   {Array.from({ length: 30 }, (_, i) => {
+                     const angle = (i * 360) / 30;
+                     const radius = 60 + Math.random() * 60;
+                     const colors = ['bg-neonGreen', 'bg-neonCyan', 'bg-neonPink', 'bg-neonPurple', 'bg-yellow-400', 'bg-white'];
+                     const color = colors[i % colors.length];
+                     return (
+                       <div
+                         key={`firework-${i}`}
+                         className={`absolute w-1.5 h-1.5 ${color} rounded-full animate-firework`}
+                         style={{
+                           left: '50%',
+                           top: '50%',
+                           transform: `rotate(${angle}deg) translateX(${radius}px)`,
+                           animationDelay: `${i * 30}ms`,
+                           boxShadow: `0 0 6px currentColor`
+                         }}
+                       />
+                     );
+                   })}
+                   {/* 闪烁的星星 ✨ */}
+                   {Array.from({ length: 12 }, (_, i) => (
+                     <div
+                       key={`star-${i}`}
+                       className="absolute text-yellow-300 animate-twinkle"
+                       style={{
+                         left: `${15 + Math.random() * 70}%`,
+                         top: `${15 + Math.random() * 70}%`,
+                         animationDelay: `${i * 100}ms`,
+                         fontSize: `${8 + Math.random() * 10}px`
+                       }}
+                     >
+                       ✦
+                     </div>
+                   ))}
+                 </>
+               )}
                
                {/* Outer glow ring */}
                <div className={`absolute w-40 h-40 rounded-full border border-neonGreen/20 ${step < 3 ? 'animate-ping' : 'opacity-0'}`}></div>
@@ -317,6 +568,12 @@ const TransactionModal: React.FC<{
                   )}
                   {step === 3 && (
                     <div className="relative animate-pixel-jump">
+                        {/* 冲击波效果 */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-20 h-20 rounded-full border-2 border-neonGreen animate-shockwave"></div>
+                          <div className="absolute w-20 h-20 rounded-full border-2 border-neonCyan animate-shockwave" style={{ animationDelay: '0.2s' }}></div>
+                          <div className="absolute w-20 h-20 rounded-full border-2 border-white animate-shockwave" style={{ animationDelay: '0.4s' }}></div>
+                        </div>
                         <div className="absolute -inset-8 bg-neonGreen blur-2xl opacity-60 animate-pulse"></div>
                         <div className="absolute -inset-4 bg-white blur-xl opacity-40 animate-ping"></div>
                         <BadgeCheck size={96} className="text-neonGreen relative z-10 drop-shadow-[0_0_30px_rgba(0,255,0,1)]" />
@@ -324,6 +581,11 @@ const TransactionModal: React.FC<{
                         <div className="absolute -top-2 -right-2 w-3 h-3 bg-white rounded-full animate-ping"></div>
                         <div className="absolute -bottom-2 -left-2 w-2 h-2 bg-neonCyan rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
                         <div className="absolute top-0 -left-4 w-2 h-2 bg-neonPurple rounded-full animate-ping" style={{ animationDelay: '0.6s' }}></div>
+                        {/* 额外的庆祝光芒 */}
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-1 h-8 bg-gradient-to-t from-neonGreen to-transparent animate-pulse"></div>
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-1 h-8 bg-gradient-to-b from-neonGreen to-transparent animate-pulse"></div>
+                        <div className="absolute top-1/2 -left-6 -translate-y-1/2 h-1 w-8 bg-gradient-to-l from-neonGreen to-transparent animate-pulse"></div>
+                        <div className="absolute top-1/2 -right-6 -translate-y-1/2 h-1 w-8 bg-gradient-to-r from-neonGreen to-transparent animate-pulse"></div>
                     </div>
                   )}
                </div>
@@ -384,6 +646,42 @@ const TransactionModal: React.FC<{
                     <div className="w-full h-0.5 bg-white absolute top-1/2 animate-expand-line"></div>
                  </div>
                </>
+            )}
+            
+            {/* 真实交易哈希链接 */}
+            {txHash && step === 3 && (
+              <div className="mt-4 text-center">
+                <a 
+                  href={`https://sepolia.basescan.org/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-neonCyan hover:text-white text-sm font-mono transition-colors border border-neonCyan/50 px-4 py-2 hover:bg-neonCyan/20"
+                >
+                  <Activity size={14} />
+                  在 BaseScan 查看交易 ↗
+                </a>
+                <p className="text-gray-500 text-xs mt-2 font-mono">
+                  TX: {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                </p>
+              </div>
+            )}
+            
+            {/* 错误状态 */}
+            {step === 4 && txError && (
+              <div className="mt-4 text-center">
+                <div className="text-red-400 font-pixel text-sm mb-2">
+                  ✕ 铸造失败
+                </div>
+                <p className="text-gray-500 text-xs">
+                  {txError.length > 100 ? txError.slice(0, 100) + '...' : txError}
+                </p>
+                <button 
+                  onClick={onComplete}
+                  className="mt-4 px-6 py-2 border border-gray-600 text-gray-400 hover:text-white hover:border-neonCyan transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
             )}
          </div>
       </div>
@@ -1771,9 +2069,10 @@ const App: React.FC = () => {
   const [sentTipMessages, setSentTipMessages] = useState<TipMessage[]>([]); // Tip messages sent
   const [creatorReplies, setCreatorReplies] = useState<CreatorReply[]>([]); // Creator replies
 
-  // Transaction State - 铸造NFT用长动画
+  // Transaction State - 铸造NFT状态（模拟）
   const [pendingMint, setPendingMint] = useState<{
     title: string;
+    podcastId: string;
     onComplete: () => void;
   } | null>(null);
   
@@ -1790,6 +2089,8 @@ const App: React.FC = () => {
       setShowWalletModal(true);
       return;
     }
+    // 播放解锁音效 🎵
+    playUnlockSound();
     // X402 即时支付 - 快速反馈
     setQuickPayment({
       message: `已解锁单集 · ${price} USDC`,
@@ -1805,6 +2106,8 @@ const App: React.FC = () => {
     const paidEps = podcast.episodes.filter(e => !e.isFree);
     const remainingPaidEps = paidEps.filter(e => !unlockedItems.includes(e.id));
     const bundlePrice = (remainingPaidEps.length * podcast.basePrice * 0.9).toFixed(3);
+    // 播放解锁音效 🎵
+    playUnlockSound();
     // X402 即时支付 - 快速反馈
     setQuickPayment({
       message: `已解锁『${podcast.title}』${remainingPaidEps.length === paidEps.length ? '全集' : `剩余${remainingPaidEps.length}集`} · ${bundlePrice} USDC`,
@@ -1820,11 +2123,21 @@ const App: React.FC = () => {
        setShowWalletModal(true);
        return;
     }
-    // 铸造NFT - 使用炫酷长动画
+    
+    const podcast = MOCK_PODCASTS.find(p => p.id === podcastId);
+    if (!podcast) return;
+    
+    // 模拟铸造 - 显示动画后直接成功
     setPendingMint({
-      title: `铸造收藏品 #${podcastId}`,
-      onComplete: () => setMintedCollections(prev => [...prev, podcastId])
+      title: `铸造 ${podcast.title} 收藏品`,
+      podcastId: podcastId,
+      onComplete: () => {
+        setMintedCollections(prev => [...prev, podcastId]);
+      }
     });
+    
+    // TransactionModal 内部会处理完整动画流程（约7秒）
+    // 不需要在这里设置 setTimeout，让 modal 的 onComplete 回调处理
   };
 
   const handleEpisodeFinish = () => {
@@ -1845,6 +2158,9 @@ const App: React.FC = () => {
     
     const podcast = MOCK_PODCASTS.find(p => p.id === podcastId);
     const messageId = `tip-${Date.now()}`;
+    
+    // 播放投币音效 🎵
+    playCoinSound();
     
     // X402 即时支付
     setQuickPayment({
@@ -1900,7 +2216,7 @@ const App: React.FC = () => {
         />
       )}
       
-      {/* Mint NFT Animation - 铸造动画 */}
+      {/* Mint NFT Animation - 铸造动画（模拟） */}
       {pendingMint && (
         <TransactionModal 
           title={pendingMint.title}

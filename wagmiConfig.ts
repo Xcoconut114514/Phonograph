@@ -23,7 +23,8 @@ export const config = createConfig({
     injected(),
   ],
   transports: {
-    [baseSepolia.id]: http(),
+    // 使用 Base Sepolia 公共 RPC
+    [baseSepolia.id]: http('https://sepolia.base.org'),
   },
 });
 
