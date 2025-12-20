@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAccount, useChainId } from 'wagmi';
+import { baseSepolia } from 'wagmi/chains';
 import { 
   Play, 
   Pause, 
@@ -29,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Podcast, ViewState, PlayerState, Episode, TipMessage, CreatorReply } from './types';
 import { MOCK_PODCASTS } from './constants';
+import { WalletModal, WalletButton } from './WalletConnect';
 
 // --- Shared Components ---
 
@@ -1556,6 +1559,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('discovery');
   
+  // 使用 wagmi 钱包连接状态
+  const { isConnected, address } = useAccount();
+  const chainId = useChainId();
+  const isCorrectNetwork = chainId === baseSepolia.id;
+  const isWalletConnected = isConnected && isCorrectNetwork;
+  
+  // 钱包弹窗状态
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  
   // Navigation State
   const [selectedPodcast, setSelectedPodcast] = useState<Podcast | null>(null); // For Detail View
   const [playingEpisode, setPlayingEpisode] = useState<Episode | null>(null); // For Player Modal
@@ -1564,7 +1576,6 @@ const App: React.FC = () => {
   const [mintedCollections, setMintedCollections] = useState<string[]>([]); // Array of Podcast IDs
   const [unlockedItems, setUnlockedItems] = useState<string[]>([]); // Array of Episode IDs
   const [finishedItems, setFinishedItems] = useState<string[]>([]); // Array of Episode IDs (Played)
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [sentTipMessages, setSentTipMessages] = useState<TipMessage[]>([]); // Tip messages sent
   const [creatorReplies, setCreatorReplies] = useState<CreatorReply[]>([]); // Creator replies
 
@@ -1584,7 +1595,7 @@ const App: React.FC = () => {
 
   const handleUnlockEpisode = (epId: string, price: number) => {
     if (!isWalletConnected) {
-      alert("请先连接钱包！");
+      setShowWalletModal(true);
       return;
     }
     // X402 即时支付 - 快速反馈
@@ -1596,7 +1607,7 @@ const App: React.FC = () => {
 
   const handleUnlockBundle = (podcast: Podcast) => {
     if (!isWalletConnected) {
-      alert("请先连接钱包！");
+      setShowWalletModal(true);
       return;
     }
     const paidEps = podcast.episodes.filter(e => !e.isFree);
@@ -1614,7 +1625,7 @@ const App: React.FC = () => {
 
   const handleMintNFT = (podcastId: string) => {
     if (!isWalletConnected) {
-       alert("请先连接钱包！");
+       setShowWalletModal(true);
        return;
     }
     // 铸造NFT - 使用炫酷长动画
@@ -1636,7 +1647,7 @@ const App: React.FC = () => {
   // 投币私信处理
   const handleSendTip = (podcastId: string, amount: number, message: string) => {
     if (!isWalletConnected) {
-      alert("请先连接钱包！");
+      setShowWalletModal(true);
       return;
     }
     
@@ -1751,16 +1762,18 @@ const App: React.FC = () => {
         </nav>
 
         <div className="mt-auto pt-6 border-t border-dashed border-gray-800 relative z-20">
-          {!isWalletConnected ? (
-            <PixelButton onClick={() => setIsWalletConnected(true)} variant="primary" className="w-full text-sm">
+          {!isConnected ? (
+            <PixelButton onClick={() => setShowWalletModal(true)} variant="primary" className="w-full text-sm">
                <Wallet size={16} /> 连接钱包
             </PixelButton>
           ) : (
-             <div className="border border-neonCyan/50 bg-black/50 p-3 text-center backdrop-blur-md">
-               <p className="text-neonCyan text-[10px] font-pixel mb-1 tracking-widest">网络: ETHEREUM</p>
+             <div className={`border ${isCorrectNetwork ? 'border-neonCyan/50' : 'border-yellow-500/50'} bg-black/50 p-3 text-center backdrop-blur-md cursor-pointer hover:bg-black/70 transition-colors`} onClick={() => setShowWalletModal(true)}>
+               <p className={`text-[10px] font-pixel mb-1 tracking-widest ${isCorrectNetwork ? 'text-neonCyan' : 'text-yellow-400'}`}>
+                 {isCorrectNetwork ? '网络: BASE SEPOLIA' : '⚠ 请切换网络'}
+               </p>
                <div className="flex justify-between items-center mt-2">
-                 <p className="text-white text-xs font-mono truncate">0x71C...92F</p>
-                 <span className="text-green-400 text-xs font-mono">1200 USDC</span>
+                 <p className="text-white text-xs font-mono truncate">{address?.slice(0, 6)}...{address?.slice(-4)}</p>
+                 <span className="text-green-400 text-xs font-mono">已连接</span>
                </div>
              </div>
           )}
@@ -1820,7 +1833,7 @@ const App: React.FC = () => {
         ) : (
           <ProfilePage 
             isWalletConnected={isWalletConnected}
-            walletAddress="0x71C7...e92F"
+            walletAddress={address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''}
             finishedEpisodes={finishedItems}
             unlockedEpisodes={unlockedItems}
             mintedCollections={mintedCollections}
@@ -1853,6 +1866,12 @@ const App: React.FC = () => {
           onFinish={handleEpisodeFinish}
         />
       )}
+
+      {/* Wallet Connect Modal */}
+      <WalletModal 
+        isOpen={showWalletModal} 
+        onClose={() => setShowWalletModal(false)} 
+      />
 
     </div>
   );
