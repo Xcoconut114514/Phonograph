@@ -20,9 +20,14 @@ import {
   Terminal,
   Box,
   Layers,
-  Hourglass
+  Hourglass,
+  MessageCircle,
+  Send,
+  Coins,
+  User,
+  Settings
 } from 'lucide-react';
-import { Podcast, ViewState, PlayerState, Episode } from './types';
+import { Podcast, ViewState, PlayerState, Episode, TipMessage, CreatorReply } from './types';
 import { MOCK_PODCASTS } from './constants';
 
 // --- Shared Components ---
@@ -406,7 +411,7 @@ const LogoWidget: React.FC = () => {
           
           <div>
             <h1 className="text-5xl font-header text-white italic tracking-tighter drop-shadow-[0_0_8px_rgba(176,38,255,0.8)]" style={{ textShadow: '3px 3px 0px #b026ff' }}>
-              留<span className="text-neonCyan drop-shadow-[0_0_8px_rgba(0,243,255,0.8)]" style={{ textShadow: '3px 3px 0px #00f3ff' }}>声机</span>
+              留声机
             </h1>
             <div className="flex items-center gap-2 mt-1 ml-1">
                <div className="text-[10px] text-gray-400 font-pixel tracking-[0.2em] uppercase border border-gray-800 px-2 py-0.5">去中心化音频协议</div>
@@ -555,8 +560,11 @@ const CollectionDetail: React.FC<DetailProps> = ({
   isMinted
 }) => {
   const paidEpisodes = podcast.episodes.filter(ep => !ep.isFree);
+  const unlockedPaidEpisodes = paidEpisodes.filter(ep => unlockedEpisodeIds.includes(ep.id));
+  const remainingPaidEpisodes = paidEpisodes.filter(ep => !unlockedEpisodeIds.includes(ep.id));
   const totalPrice = paidEpisodes.length * podcast.basePrice;
-  const bundlePrice = (totalPrice * 0.9).toFixed(3);
+  const remainingPrice = remainingPaidEpisodes.length * podcast.basePrice;
+  const bundlePrice = (remainingPrice * 0.9).toFixed(3);
   
   // Check unlock status (payment)
   const isFullyUnlocked = paidEpisodes.every(ep => unlockedEpisodeIds.includes(ep.id));
@@ -610,16 +618,22 @@ const CollectionDetail: React.FC<DetailProps> = ({
                 )
              ) : (
                 <div className="bg-gray-800 p-4 border border-gray-700">
+                   {unlockedPaidEpisodes.length > 0 && (
+                     <div className="flex justify-between items-center mb-2 text-neonGreen text-xs font-mono">
+                        <span>已解锁:</span>
+                        <span>{unlockedPaidEpisodes.length}/{paidEpisodes.length} 集</span>
+                     </div>
+                   )}
                    <div className="flex justify-between items-center mb-2 text-gray-300 text-xs font-mono">
-                      <span>单集总价:</span>
-                      <span className="line-through">{totalPrice.toFixed(2)} USDC</span>
+                      <span>剩余单集总价:</span>
+                      <span className="line-through">{remainingPrice.toFixed(2)} USDC</span>
                    </div>
                    <div className="flex justify-between items-center mb-4 text-neonCyan font-header">
-                      <span>打包优惠 (9折):</span>
+                      <span>优惠:</span>
                       <span className="text-xl">{bundlePrice} USDC</span>
                    </div>
                    <PixelButton onClick={unlockBundle} variant="secondary" className="w-full">
-                      <Package size={18} /> 购买整套合集
+                      <Package size={18} /> {unlockedPaidEpisodes.length > 0 ? '解锁剩余合集' : '购买整套合集'}
                    </PixelButton>
                 </div>
              )}
@@ -1023,6 +1037,520 @@ const Museum: React.FC<{ collectedIds: string[]; allPodcasts: Podcast[]; onViewC
   );
 };
 
+// --- Tipping / Private Message Board ---
+
+interface TippingBoardProps {
+  podcasts: Podcast[];
+  isWalletConnected: boolean;
+  onSendTip: (podcastId: string, amount: number, message: string) => void;
+  sentMessages: TipMessage[];
+  creatorReplies: CreatorReply[];
+}
+
+const TippingBoard: React.FC<TippingBoardProps> = ({ podcasts, isWalletConnected, onSendTip, sentMessages, creatorReplies }) => {
+  const [selectedCreator, setSelectedCreator] = useState<Podcast | null>(null);
+  const [tipAmount, setTipAmount] = useState<string>('');
+  const [messageText, setMessageText] = useState<string>('');
+  const [justSent, setJustSent] = useState<string | null>(null); // 刚发送成功的消息ID
+  
+  // Only show podcasts with tipping enabled
+  const tippablePodcasts = podcasts.filter(p => p.tipEnabled);
+  
+  const handleSendTip = () => {
+    if (!selectedCreator || !isWalletConnected) return;
+    
+    const amount = parseFloat(tipAmount);
+    if (isNaN(amount) || amount < (selectedCreator.minTipAmount || 0)) {
+      alert(`最低投币金额: ${selectedCreator.minTipAmount} USDC`);
+      return;
+    }
+    
+    if (!messageText.trim()) {
+      alert('请输入留言内容');
+      return;
+    }
+    
+    onSendTip(selectedCreator.id, amount, messageText);
+    setTipAmount('');
+    setMessageText('');
+    // 显示发送成功提示
+    const msgId = Date.now().toString();
+    setJustSent(msgId);
+    setTimeout(() => setJustSent(null), 3000);
+  };
+  
+  return (
+    <div className="space-y-8">
+      {/* Creator Selection */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {tippablePodcasts.map(podcast => (
+          <div 
+            key={podcast.id}
+            onClick={() => setSelectedCreator(podcast)}
+            className={`relative p-6 border-2 cursor-pointer transition-all duration-300 ${
+              selectedCreator?.id === podcast.id 
+                ? 'border-neonCyan bg-neonCyan/10 shadow-[0_0_30px_rgba(0,243,255,0.3)]' 
+                : 'border-gray-700 bg-gray-900/50 hover:border-gray-500'
+            }`}
+          >
+            {/* Selected indicator */}
+            {selectedCreator?.id === podcast.id && (
+              <div className="absolute top-2 right-2 w-3 h-3 bg-neonCyan rounded-full animate-pulse"></div>
+            )}
+            
+            <div className="flex gap-4">
+              {/* Avatar */}
+              <div className="w-20 h-20 rounded-full border-2 border-neonPurple overflow-hidden bg-black shadow-[0_0_15px_rgba(176,38,255,0.4)]">
+                <img src={podcast.avatarUrl} alt={podcast.author} className="w-full h-full object-cover" />
+              </div>
+              
+              <div className="flex-1">
+                <h3 className="text-white font-header text-lg mb-1">@{podcast.author}</h3>
+                <p className="text-gray-400 text-sm font-pixel mb-2">{podcast.title}</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-600 px-2 py-0.5 flex items-center gap-1">
+                    <Coins size={10} /> 最低 {podcast.minTipAmount} USDC
+                  </span>
+                  <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                    <MessageCircle size={10} /> 接受私信
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Tip Form */}
+      {selectedCreator && (
+        <div className="bg-gray-900/80 border-2 border-neonPurple p-6 relative overflow-hidden">
+          {/* Background pattern */}
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(176,38,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(176,38,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-700">
+              <MessageCircle size={24} className="text-neonPurple" />
+              <h3 className="text-white font-header text-xl">向 @{selectedCreator.author} 投币私信</h3>
+            </div>
+            
+            {/* Amount Input */}
+            <div className="mb-4">
+              <label className="block text-gray-400 text-sm font-pixel mb-2">
+                投币金额 (最低 {selectedCreator.minTipAmount} USDC)
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    value={tipAmount}
+                    onChange={(e) => setTipAmount(e.target.value)}
+                    placeholder={`${selectedCreator.minTipAmount}`}
+                    min={selectedCreator.minTipAmount}
+                    step="0.01"
+                    className="w-full bg-black border-2 border-gray-700 focus:border-neonCyan px-4 py-3 text-white font-mono text-lg outline-none transition-colors"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neonCyan font-mono">USDC</span>
+                </div>
+                {/* Quick amount buttons */}
+                <div className="flex gap-2">
+                  {[0.1, 0.5, 1].map(amt => (
+                    <button
+                      key={amt}
+                      onClick={() => setTipAmount(amt.toString())}
+                      className="px-3 py-2 bg-gray-800 border border-gray-600 text-gray-300 hover:border-neonCyan hover:text-neonCyan transition-colors font-mono text-sm"
+                    >
+                      {amt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Message Input */}
+            <div className="mb-6">
+              <label className="block text-gray-400 text-sm font-pixel mb-2">
+                留言内容
+              </label>
+              <textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="写下你想对博主说的话..."
+                rows={4}
+                maxLength={500}
+                className="w-full bg-black border-2 border-gray-700 focus:border-neonCyan px-4 py-3 text-white font-pixel outline-none transition-colors resize-none"
+              />
+              <div className="text-right text-[10px] text-gray-500 mt-1">{messageText.length}/500</div>
+            </div>
+            
+            {/* Send Button */}
+            <PixelButton 
+              onClick={handleSendTip} 
+              variant="primary" 
+              className="w-full py-4"
+              disabled={!isWalletConnected}
+            >
+              <Send size={18} />
+              {isWalletConnected ? `发送 ${tipAmount || '0'} USDC 并留言` : '请先连接钱包'}
+            </PixelButton>
+            
+            {/* 发送成功提示 */}
+            {justSent && (
+              <div className="mt-4 p-4 bg-neonGreen/20 border-2 border-neonGreen text-neonGreen font-pixel text-center animate-pulse">
+                <CheckCircle2 size={24} className="inline-block mr-2" />
+                私信发送成功！博主会尽快回复您~
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Messages Section - Two Column Layout */}
+      {(sentMessages.length > 0 || creatorReplies.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          {/* Left: Sent Messages History */}
+          <div className="bg-gray-900/50 border-2 border-gray-700 p-6">
+            <h3 className="text-white font-header text-lg mb-4 flex items-center gap-2 pb-3 border-b border-gray-700">
+              <Send size={18} className="text-neonCyan" /> 已发送的私信
+              <span className="ml-auto text-xs bg-neonCyan/20 text-neonCyan px-2 py-0.5 rounded-full">{sentMessages.length}</span>
+            </h3>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {sentMessages.length === 0 ? (
+                <p className="text-gray-500 text-center py-8 font-pixel text-sm">暂无发送记录</p>
+              ) : sentMessages.map(msg => {
+                const podcast = podcasts.find(p => p.id === msg.podcastId);
+                const hasReply = creatorReplies.some(r => r.tipMessageId === msg.id);
+                return (
+                  <div 
+                    key={msg.id} 
+                    className={`bg-black/50 border p-4 transition-all ${hasReply ? 'border-neonGreen' : 'border-gray-700'}`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <User size={14} className="text-gray-500" />
+                        <span className="text-neonCyan font-mono text-sm">→ @{podcast?.author}</span>
+                      </div>
+                      <span className="text-yellow-400 font-mono text-xs bg-yellow-500/20 px-2 py-0.5">{msg.amount} USDC</span>
+                    </div>
+                    <p className="text-gray-300 font-pixel text-sm mb-2">{msg.message}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-600">{msg.timestamp.toLocaleString('zh-CN')}</span>
+                      {hasReply && (
+                        <span className="text-[10px] text-neonGreen flex items-center gap-1">
+                          <CheckCircle2 size={10} /> 已回复
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Right: Creator Replies */}
+          <div className="bg-gray-900/50 border-2 border-neonPurple p-6">
+            <h3 className="text-white font-header text-lg mb-4 flex items-center gap-2 pb-3 border-b border-gray-700">
+              <MessageCircle size={18} className="text-neonPurple" /> 博主回复
+              <span className="ml-auto text-xs bg-neonPurple/20 text-neonPurple px-2 py-0.5 rounded-full">{creatorReplies.length}</span>
+            </h3>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {creatorReplies.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageCircle size={32} className="mx-auto mb-3 text-gray-600 animate-pulse" />
+                  <p className="text-gray-500 font-pixel text-sm">等待博主回复中...</p>
+                  <p className="text-gray-600 font-pixel text-xs mt-1">博主通常会在几分钟内回复</p>
+                </div>
+              ) : creatorReplies.map(reply => {
+                const podcast = podcasts.find(p => p.id === reply.podcastId);
+                const originalMsg = sentMessages.find(m => m.id === reply.tipMessageId);
+                return (
+                  <div key={reply.id} className="bg-neonPurple/10 border border-neonPurple/50 p-4 relative overflow-hidden">
+                    {/* Decorative element */}
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-neonPurple/10 rounded-full blur-xl"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-full border border-neonPurple overflow-hidden">
+                          <img src={podcast?.avatarUrl} alt={reply.author} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-neonPurple font-header">@{reply.author}</span>
+                        <span className="text-[10px] text-gray-500 ml-auto">{reply.timestamp.toLocaleString('zh-CN')}</span>
+                      </div>
+                      
+                      <p className="text-white font-pixel text-sm mb-3 leading-relaxed">{reply.message}</p>
+                      
+                      {originalMsg && (
+                        <div className="bg-black/30 border-l-2 border-gray-600 pl-3 py-2 text-xs text-gray-500">
+                          <span className="text-gray-400">回复你的留言：</span>
+                          <p className="truncate mt-1">"{originalMsg.message}"</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Empty State */}
+      {!selectedCreator && sentMessages.length === 0 && (
+        <div className="text-center py-12 text-gray-500 font-pixel">
+          <Coins size={48} className="mx-auto mb-4 opacity-30" />
+          <p>选择一位博主开始投币私信</p>
+          <p className="text-xs mt-2 text-gray-600">通过 X402 协议即时支付，直达创作者</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Profile Page Component ---
+
+interface ProfilePageProps {
+  isWalletConnected: boolean;
+  walletAddress: string;
+  finishedEpisodes: string[];
+  unlockedEpisodes: string[];
+  mintedCollections: string[];
+  allPodcasts: Podcast[];
+}
+
+const ProfilePage: React.FC<ProfilePageProps> = ({ 
+  isWalletConnected, 
+  walletAddress, 
+  finishedEpisodes, 
+  unlockedEpisodes, 
+  mintedCollections,
+  allPodcasts 
+}) => {
+  const [userName, setUserName] = useState('匿名用户');
+  const [userBio, setUserBio] = useState('这个人很懒，什么都没写...');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(userName);
+  const [editBio, setEditBio] = useState(userBio);
+  
+  // 生成基于钱包地址的头像
+  const avatarUrl = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${walletAddress || 'default'}&backgroundColor=0d1117`;
+  
+  // 收听记录统计
+  const totalListened = finishedEpisodes.length;
+  const totalUnlocked = unlockedEpisodes.length;
+  const totalMinted = mintedCollections.length;
+  
+  // 获取收听过的播客详情
+  const listenedPodcasts = allPodcasts.filter(podcast => 
+    podcast.episodes.some(ep => finishedEpisodes.includes(ep.id))
+  );
+  
+  const handleSaveProfile = () => {
+    setUserName(editName);
+    setUserBio(editBio);
+    setIsEditing(false);
+  };
+  
+  if (!isWalletConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="w-32 h-32 rounded-full bg-gray-800 border-4 border-gray-700 flex items-center justify-center mb-6">
+          <Wallet size={48} className="text-gray-600" />
+        </div>
+        <h3 className="text-2xl text-white font-header mb-3">请连接钱包</h3>
+        <p className="text-gray-500 font-pixel text-sm mb-6">连接钱包后即可查看个人主页</p>
+        <div className="flex items-center gap-2 text-neonCyan font-mono text-sm border border-neonCyan/50 px-4 py-2 bg-neonCyan/10">
+          <Lock size={16} />
+          使用钱包签名登录
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-8">
+      {/* Profile Header */}
+      <div className="bg-gray-900/80 border-2 border-neonGreen p-8 relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(57,255,20,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(57,255,20,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row gap-8">
+          {/* Avatar */}
+          <div className="flex flex-col items-center">
+            <div className="w-32 h-32 rounded-full border-4 border-neonGreen shadow-[0_0_30px_rgba(57,255,20,0.4)] overflow-hidden bg-black">
+              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-[10px] bg-neonGreen/20 text-neonGreen border border-neonGreen px-3 py-1">
+              <Activity size={12} /> 已验证钱包
+            </div>
+          </div>
+          
+          {/* User Info */}
+          <div className="flex-1">
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-gray-400 text-sm font-pixel mb-2">用户名</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    maxLength={20}
+                    className="w-full bg-black border-2 border-gray-700 focus:border-neonGreen px-4 py-2 text-white font-pixel outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 text-sm font-pixel mb-2">个人简介</label>
+                  <textarea
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                    maxLength={100}
+                    rows={3}
+                    className="w-full bg-black border-2 border-gray-700 focus:border-neonGreen px-4 py-2 text-white font-pixel outline-none transition-colors resize-none"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <PixelButton onClick={handleSaveProfile} variant="primary" className="px-6">
+                    <CheckCircle2 size={16} /> 保存
+                  </PixelButton>
+                  <PixelButton onClick={() => setIsEditing(false)} variant="secondary" className="px-6">
+                    取消
+                  </PixelButton>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-4 mb-3">
+                  <h2 className="text-3xl text-white font-header">{userName}</h2>
+                  <button 
+                    onClick={() => { setEditName(userName); setEditBio(userBio); setIsEditing(true); }}
+                    className="text-gray-500 hover:text-neonGreen transition-colors"
+                  >
+                    <Settings size={18} />
+                  </button>
+                </div>
+                
+                <p className="text-gray-400 font-pixel mb-4">{userBio}</p>
+                
+                <div className="flex items-center gap-2 text-neonCyan font-mono text-sm mb-4">
+                  <Wallet size={14} />
+                  <span>{walletAddress}</span>
+                </div>
+                
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mt-6">
+                  <div className="bg-black/50 border border-gray-700 p-4 text-center">
+                    <div className="text-2xl text-neonCyan font-header">{totalListened}</div>
+                    <div className="text-[10px] text-gray-500 font-pixel mt-1">已收听</div>
+                  </div>
+                  <div className="bg-black/50 border border-gray-700 p-4 text-center">
+                    <div className="text-2xl text-yellow-400 font-header">{totalUnlocked}</div>
+                    <div className="text-[10px] text-gray-500 font-pixel mt-1">已解锁</div>
+                  </div>
+                  <div className="bg-black/50 border border-gray-700 p-4 text-center">
+                    <div className="text-2xl text-neonPink font-header">{totalMinted}</div>
+                    <div className="text-[10px] text-gray-500 font-pixel mt-1">NFT馆藏</div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Listening History */}
+      <div className="bg-gray-900/50 border-2 border-gray-700 p-6">
+        <h3 className="text-white font-header text-xl mb-6 flex items-center gap-3 pb-4 border-b border-gray-700">
+          <Headphones size={22} className="text-neonCyan" /> 收听记录
+          <span className="ml-auto text-xs bg-gray-800 text-gray-400 px-3 py-1 rounded-full font-mono">
+            {totalListened} 集
+          </span>
+        </h3>
+        
+        {listenedPodcasts.length === 0 ? (
+          <div className="text-center py-12">
+            <Disc size={48} className="mx-auto mb-4 text-gray-700 animate-spin" style={{ animationDuration: '8s' }} />
+            <p className="text-gray-500 font-pixel">暂无收听记录</p>
+            <p className="text-gray-600 font-pixel text-xs mt-2">开始探索电台，发现好内容~</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {listenedPodcasts.map(podcast => {
+              const listenedEps = podcast.episodes.filter(ep => finishedEpisodes.includes(ep.id));
+              const progress = (listenedEps.length / podcast.episodes.length) * 100;
+              const isMinted = mintedCollections.includes(podcast.id);
+              
+              return (
+                <div key={podcast.id} className="bg-black/50 border border-gray-800 p-4 flex gap-4 hover:border-gray-600 transition-colors">
+                  {/* Cover */}
+                  <div className="w-20 h-20 bg-gray-800 overflow-hidden flex-shrink-0">
+                    <img src={podcast.coverUrl} alt={podcast.title} className="w-full h-full object-cover" />
+                  </div>
+                  
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="text-white font-header truncate">{podcast.title}</h4>
+                      {isMinted && (
+                        <span className="text-[10px] bg-neonPink/20 text-neonPink border border-neonPink px-2 py-0.5 flex-shrink-0">
+                          NFT
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-500 text-xs font-pixel mb-3">@{podcast.author}</p>
+                    
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-neonCyan to-neonGreen transition-all duration-500"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {listenedEps.length}/{podcast.episodes.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
+      {/* Wallet Activity */}
+      <div className="bg-gray-900/50 border-2 border-gray-700 p-6">
+        <h3 className="text-white font-header text-xl mb-6 flex items-center gap-3 pb-4 border-b border-gray-700">
+          <Activity size={22} className="text-neonPurple" /> 链上活动
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-black/50 border border-neonCyan/30 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-neonCyan/20 border border-neonCyan flex items-center justify-center">
+              <Zap size={20} className="text-neonCyan" />
+            </div>
+            <div>
+              <div className="text-white font-pixel text-sm">X402 支付协议</div>
+              <div className="text-[10px] text-gray-500 mt-1">即时微支付 · 低Gas费</div>
+            </div>
+            <div className="ml-auto text-neonGreen text-xs font-mono">已启用</div>
+          </div>
+          
+          <div className="bg-black/50 border border-neonPurple/30 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-neonPurple/20 border border-neonPurple flex items-center justify-center">
+              <Landmark size={20} className="text-neonPurple" />
+            </div>
+            <div>
+              <div className="text-white font-pixel text-sm">NFT 铸造</div>
+              <div className="text-[10px] text-gray-500 mt-1">收藏证明 · 永久存证</div>
+            </div>
+            <div className="ml-auto text-yellow-400 text-xs font-mono">{totalMinted} 个</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App Shell ---
 
 const App: React.FC = () => {
@@ -1037,6 +1565,8 @@ const App: React.FC = () => {
   const [unlockedItems, setUnlockedItems] = useState<string[]>([]); // Array of Episode IDs
   const [finishedItems, setFinishedItems] = useState<string[]>([]); // Array of Episode IDs (Played)
   const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [sentTipMessages, setSentTipMessages] = useState<TipMessage[]>([]); // Tip messages sent
+  const [creatorReplies, setCreatorReplies] = useState<CreatorReply[]>([]); // Creator replies
 
   // Transaction State - 铸造NFT用长动画
   const [pendingMint, setPendingMint] = useState<{
@@ -1070,12 +1600,13 @@ const App: React.FC = () => {
       return;
     }
     const paidEps = podcast.episodes.filter(e => !e.isFree);
-    const bundlePrice = (paidEps.length * podcast.basePrice * 0.9).toFixed(3);
+    const remainingPaidEps = paidEps.filter(e => !unlockedItems.includes(e.id));
+    const bundlePrice = (remainingPaidEps.length * podcast.basePrice * 0.9).toFixed(3);
     // X402 即时支付 - 快速反馈
     setQuickPayment({
-      message: `已解锁『${podcast.title}』全集 · ${bundlePrice} USDC`,
+      message: `已解锁『${podcast.title}』${remainingPaidEps.length === paidEps.length ? '全集' : `剩余${remainingPaidEps.length}集`} · ${bundlePrice} USDC`,
       onComplete: () => {
-        const newIds = paidEps.map(e => e.id);
+        const newIds = remainingPaidEps.map(e => e.id);
         setUnlockedItems(prev => [...new Set([...prev, ...newIds])]);
       }
     });
@@ -1100,6 +1631,55 @@ const App: React.FC = () => {
             return [...prev, playingEpisode.id];
         });
      }
+  };
+
+  // 投币私信处理
+  const handleSendTip = (podcastId: string, amount: number, message: string) => {
+    if (!isWalletConnected) {
+      alert("请先连接钱包！");
+      return;
+    }
+    
+    const podcast = MOCK_PODCASTS.find(p => p.id === podcastId);
+    const messageId = `tip-${Date.now()}`;
+    
+    // X402 即时支付
+    setQuickPayment({
+      message: `已向 @${podcast?.author} 投币 ${amount} USDC`,
+      onComplete: () => {
+        const newMessage: TipMessage = {
+          id: messageId,
+          podcastId,
+          author: '0x71C...92F',
+          amount,
+          message,
+          timestamp: new Date()
+        };
+        setSentTipMessages(prev => [newMessage, ...prev]);
+        
+        // 模拟博主回复 (3-5秒后)
+        setTimeout(() => {
+          const replies = [
+            "感谢你的支持！🎉 会继续努力更新的~",
+            "收到！你的留言我会认真看的 ❤️",
+            "太感动了！谢谢你的投币 🙏",
+            "哇，收到你的私信了！感谢支持！",
+            "谢谢！有什么想听的内容可以告诉我~"
+          ];
+          const randomReply = replies[Math.floor(Math.random() * replies.length)];
+          
+          const newReply: CreatorReply = {
+            id: `reply-${Date.now()}`,
+            tipMessageId: messageId,
+            podcastId,
+            author: podcast?.author || '未知博主',
+            message: randomReply,
+            timestamp: new Date()
+          };
+          setCreatorReplies(prev => [newReply, ...prev]);
+        }, 3000 + Math.random() * 2000);
+      }
+    });
   };
 
   return (
@@ -1150,6 +1730,24 @@ const App: React.FC = () => {
             <Landmark size={24} className={`relative z-10 transition-transform ${view === 'collection' ? 'animate-bounce' : 'group-hover:scale-110'}`} /> 
             <span className="relative z-10">留声博物馆</span>
           </button>
+          
+          <button 
+            onClick={() => { setView('tipping'); setSelectedPodcast(null); }}
+            className={`group w-full text-left px-5 py-4 font-header text-lg tracking-wider border-2 transition-all duration-300 flex items-center gap-4 relative overflow-hidden ${view === 'tipping' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400 shadow-[0_0_25px_rgba(234,179,8,0.3)]' : 'bg-gray-900/40 border-gray-800 text-gray-500 hover:text-white hover:border-gray-600 hover:bg-gray-800'}`}
+          >
+            <div className={`absolute inset-0 bg-yellow-500/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ${view === 'tipping' ? 'animate-pulse' : ''}`}></div>
+            <Coins size={24} className={`relative z-10 transition-transform ${view === 'tipping' ? 'animate-bounce' : 'group-hover:scale-110'}`} /> 
+            <span className="relative z-10">投币私信</span>
+          </button>
+          
+          <button 
+            onClick={() => { setView('profile'); setSelectedPodcast(null); }}
+            className={`group w-full text-left px-5 py-4 font-header text-lg tracking-wider border-2 transition-all duration-300 flex items-center gap-4 relative overflow-hidden ${view === 'profile' ? 'bg-neonGreen/20 border-neonGreen text-neonGreen shadow-[0_0_25px_rgba(57,255,20,0.3)]' : 'bg-gray-900/40 border-gray-800 text-gray-500 hover:text-white hover:border-gray-600 hover:bg-gray-800'}`}
+          >
+            <div className={`absolute inset-0 bg-neonGreen/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ${view === 'profile' ? 'animate-pulse' : ''}`}></div>
+            <User size={24} className={`relative z-10 transition-transform ${view === 'profile' ? 'animate-bounce' : 'group-hover:scale-110'}`} /> 
+            <span className="relative z-10">个人主页</span>
+          </button>
         </nav>
 
         <div className="mt-auto pt-6 border-t border-dashed border-gray-800 relative z-20">
@@ -1178,8 +1776,12 @@ const App: React.FC = () => {
             <h2 className="text-4xl text-white font-header mb-2 glitch-text uppercase">
               {view === 'discovery' ? (
                 <>最新电台 /// <span className="text-neonCyan animate-pulse">X402</span></>
-              ) : (
+              ) : view === 'collection' ? (
                 <>留声博物馆 /// <span className="text-red-500 animate-pulse-slow drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]">NFT馆藏</span></>
+              ) : view === 'tipping' ? (
+                <>投币私信 /// <span className="text-yellow-400 animate-pulse drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]">直达创作者</span></>
+              ) : (
+                <>个人主页 /// <span className="text-neonGreen animate-pulse drop-shadow-[0_0_10px_rgba(57,255,20,0.8)]">钱包身份</span></>
               )}
             </h2>
             <div className="h-1 w-20 bg-neonPurple"></div>
@@ -1201,11 +1803,28 @@ const App: React.FC = () => {
               />
             ))}
           </div>
-        ) : (
+        ) : view === 'collection' ? (
           <Museum 
             collectedIds={mintedCollections} 
             allPodcasts={MOCK_PODCASTS} 
             onViewCollection={(p) => setSelectedPodcast(p)} 
+          />
+        ) : view === 'tipping' ? (
+          <TippingBoard 
+            podcasts={MOCK_PODCASTS.filter(p => p.tipEnabled)}
+            isWalletConnected={isWalletConnected}
+            onSendTip={handleSendTip}
+            sentMessages={sentTipMessages}
+            creatorReplies={creatorReplies}
+          />
+        ) : (
+          <ProfilePage 
+            isWalletConnected={isWalletConnected}
+            walletAddress="0x71C7...e92F"
+            finishedEpisodes={finishedItems}
+            unlockedEpisodes={unlockedItems}
+            mintedCollections={mintedCollections}
+            allPodcasts={MOCK_PODCASTS}
           />
         )}
       </main>

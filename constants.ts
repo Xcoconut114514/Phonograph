@@ -196,7 +196,9 @@ export const MOCK_PODCASTS: Podcast[] = [
     coverUrl: getCover('abstract geometric nodes network blue gold'), 
     avatarUrl: getAvatar('dao_explorer_v2'),
     tags: ['DeFi', '商业'],
-    episodes: web3BusinessEpisodes
+    episodes: web3BusinessEpisodes,
+    tipEnabled: true,
+    minTipAmount: 0.1
   },
   { 
     id: '2', 
@@ -209,7 +211,9 @@ export const MOCK_PODCASTS: Podcast[] = [
     coverUrl: getCover('neon city rainy night street cyber'), 
     avatarUrl: getAvatar('night_city_ghost_v2'),
     tags: ['科幻', '杂谈'],
-    episodes: cyberpunkEpisodes
+    episodes: cyberpunkEpisodes,
+    tipEnabled: true,
+    minTipAmount: 0.05
   },
   { 
     id: '3', 
