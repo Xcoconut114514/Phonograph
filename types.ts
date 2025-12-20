@@ -4,6 +4,7 @@ export interface Episode {
   duration: number; // minutes
   isFree: boolean;
   audioText?: string; // Text content for TTS playback
+  audioUrl?: string; // Direct audio URL (MP3/etc) - takes priority over TTS
 }
 
 export interface Podcast {

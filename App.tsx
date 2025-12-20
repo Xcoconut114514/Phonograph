@@ -704,26 +704,130 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
   const [playerState, setPlayerState] = useState<PlayerState>('playing');
   const [progress, setProgress] = useState(0);
   const [currentText, setCurrentText] = useState('');
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<number | null>(null);
-  const hasAudio = !!episode.audioText;
+  
+  // Determine playback mode: real audio URL > TTS > demo
+  const [audioError, setAudioError] = useState(false);
+  const hasRealAudio = !!episode.audioUrl && !audioError;
+  const hasTTS = !!episode.audioText;
+  const hasAudio = hasRealAudio || hasTTS;
 
-  // Initialize and control speech synthesis
+  // Format time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Real Audio Player (HTML5 Audio)
   useEffect(() => {
-    if (!hasAudio) return;
+    if (!episode.audioUrl || audioError) return;
+    
+    const audio = new Audio();
+    audioRef.current = audio;
+    
+    // Set crossOrigin to anonymous for CORS
+    audio.crossOrigin = 'anonymous';
+    
+    audio.onloadedmetadata = () => {
+      console.log('Audio loaded, duration:', audio.duration);
+      setAudioDuration(audio.duration);
+    };
+    
+    audio.oncanplaythrough = () => {
+      console.log('Audio can play through');
+      audio.play().catch((err) => {
+        console.error('Play failed:', err);
+        setAudioError(true);
+      });
+    };
+    
+    audio.ontimeupdate = () => {
+      setCurrentTime(audio.currentTime);
+      if (audio.duration > 0) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      }
+    };
+    
+    audio.onended = () => {
+      setPlayerState('finished');
+      setProgress(100);
+      onFinish();
+    };
+    
+    audio.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      setAudioError(true);
+    };
+    
+    // Set source after event handlers
+    audio.src = episode.audioUrl!;
+    audio.load();
+    
+    return () => {
+      audio.pause();
+      audio.src = '';
+    };
+  }, [episode.audioUrl, audioError, onFinish]);
+
+  // TTS fallback (only if no real audio)
+  useEffect(() => {
+    if (hasRealAudio || !hasTTS) return;
     
     // Cancel any existing speech
     window.speechSynthesis.cancel();
     
-    const utterance = new SpeechSynthesisUtterance(episode.audioText);
-    utterance.lang = 'zh-CN';
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
+    // 将文本分成更自然的段落朗读
+    const text = episode.audioText || '';
     
-    // Try to find a Chinese voice
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    
+    // 更自然的语音参数
+    utterance.rate = 0.95; // 稍微慢一点，更自然
+    utterance.pitch = 1.05; // 略微提高音调，更有活力
+    utterance.volume = 1.0;
+    
+    // 尝试选择最好的中文语音
     const voices = window.speechSynthesis.getVoices();
-    const chineseVoice = voices.find(v => v.lang.includes('zh')) || voices[0];
-    if (chineseVoice) utterance.voice = chineseVoice;
+    
+    // 优先选择高质量的中文语音
+    const preferredVoices = [
+      'Microsoft Xiaoxiao Online (Natural)', // Edge 高质量
+      'Microsoft Yunxi Online (Natural)',
+      'Google 普通话（中国大陆）',
+      'Ting-Ting', // macOS
+      'Mei-Jia', // macOS
+    ];
+    
+    let selectedVoice = null;
+    for (const preferred of preferredVoices) {
+      selectedVoice = voices.find(v => v.name.includes(preferred));
+      if (selectedVoice) break;
+    }
+    
+    // 回退到任何中文语音
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => 
+        v.lang.includes('zh-CN') || 
+        v.lang.includes('zh_CN') ||
+        v.lang === 'zh-CN'
+      );
+    }
+    
+    // 最后回退
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => v.lang.includes('zh')) || voices[0];
+    }
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      console.log('Selected voice:', selectedVoice.name);
+    }
     
     // Progress tracking based on speech
     utterance.onstart = () => {
@@ -748,7 +852,7 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
     return () => {
       window.speechSynthesis.cancel();
     };
-  }, [episode.audioText, hasAudio]);
+  }, [episode.audioText, hasRealAudio, hasTTS, onFinish]);
   
   // Handle voices loading (they load async)
   useEffect(() => {
@@ -759,16 +863,19 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // Progress simulation for visual feedback
+  // Progress simulation for visual feedback (only for TTS/demo mode, not real audio)
   useEffect(() => {
+    // Skip if using real audio (it has its own progress tracking)
+    if (hasRealAudio) return;
+    
     if (playerState === 'playing') {
-      const totalDuration = hasAudio ? episode.duration * 60 * 1000 : 10000; // Real duration or 10s demo
+      const totalDuration = hasTTS ? episode.duration * 60 * 1000 : 10000; // Real duration or 10s demo
       const interval = totalDuration / 100;
       
       progressRef.current = window.setInterval(() => {
         setProgress(p => {
           if (p >= 100) {
-            if (!hasAudio) {
+            if (!hasTTS) {
               setPlayerState('finished');
               onFinish();
             }
@@ -783,11 +890,11 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
     return () => {
       if (progressRef.current) clearInterval(progressRef.current);
     };
-  }, [playerState, episode.duration, hasAudio, onFinish]);
+  }, [playerState, episode.duration, hasRealAudio, hasTTS, onFinish]);
   
-  // Display current text being spoken (typewriter effect)
+  // Display current text being spoken (typewriter effect) - for TTS mode
   useEffect(() => {
-    if (!hasAudio || !episode.audioText) return;
+    if (hasRealAudio || !hasTTS || !episode.audioText) return;
     
     const words = episode.audioText.split('');
     let index = 0;
@@ -799,15 +906,23 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
     }, 80);
     
     return () => clearInterval(textInterval);
-  }, [episode.audioText, hasAudio, playerState]);
+  }, [episode.audioText, hasRealAudio, hasTTS, playerState]);
 
   const togglePlay = () => {
     if (playerState === 'playing') {
       setPlayerState('paused');
-      if (hasAudio) window.speechSynthesis.pause();
+      if (hasRealAudio && audioRef.current) {
+        audioRef.current.pause();
+      } else if (hasTTS) {
+        window.speechSynthesis.pause();
+      }
     } else if (playerState === 'paused') {
       setPlayerState('playing');
-      if (hasAudio) window.speechSynthesis.resume();
+      if (hasRealAudio && audioRef.current) {
+        audioRef.current.play();
+      } else if (hasTTS) {
+        window.speechSynthesis.resume();
+      }
     } else if (playerState === 'finished') {
       // 已完成状态下点击直接关闭播放器
       handleClose();
@@ -815,6 +930,10 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
   };
   
   const handleClose = () => {
+    if (hasRealAudio && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
     window.speechSynthesis.cancel();
     onClose();
   };
@@ -871,18 +990,29 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
             </div>
             <div className="mt-2 text-center">
                <h3 className="text-white font-header text-sm tracking-wide truncate px-4">{episode.title}</h3>
-               <p className="text-[10px] text-gray-500 font-mono">{hasAudio ? '语音播放中' : '演示模式'}</p>
+               <p className="text-[10px] text-gray-500 font-mono">
+                 {hasRealAudio ? '🎵 原版音频' : hasTTS ? '🔊 语音合成' : '演示模式'}
+               </p>
             </div>
           </div>
 
-          {/* Text Display Area for Speech */}
-          {hasAudio && (
+          {/* Text Display Area for Speech - only for TTS mode */}
+          {hasTTS && !hasRealAudio && (
             <div className="relative bg-black/60 border border-gray-700 rounded p-4 mb-6 h-32 overflow-y-auto">
               <div className="absolute top-2 right-2 text-[10px] text-neonCyan font-mono opacity-60">实时字幕</div>
               <p className="text-gray-300 font-pixel text-sm leading-relaxed">
                 {currentText}
                 <span className="inline-block w-2 h-4 bg-neonCyan ml-1 animate-blink"></span>
               </p>
+            </div>
+          )}
+          
+          {/* Real Audio Time Display */}
+          {hasRealAudio && (
+            <div className="flex justify-between items-center mb-2 px-1">
+              <span className="text-neonCyan font-mono text-sm">{formatTime(currentTime)}</span>
+              <span className="text-gray-500 font-mono text-xs">原版音频播放中</span>
+              <span className="text-gray-400 font-mono text-sm">{formatTime(audioDuration)}</span>
             </div>
           )}
 
@@ -897,10 +1027,18 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
                 const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
                 setProgress(newProgress);
                 
+                // Seek real audio if available
+                if (hasRealAudio && audioRef.current && audioDuration > 0) {
+                  audioRef.current.currentTime = (newProgress / 100) * audioDuration;
+                }
+                
                 // If dragged to end (>= 95%), mark as finished
                 if (newProgress >= 95) {
                   setProgress(100);
                   setPlayerState('finished');
+                  if (hasRealAudio && audioRef.current) {
+                    audioRef.current.pause();
+                  }
                   window.speechSynthesis.cancel();
                   onFinish();
                 }
@@ -912,6 +1050,11 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
                   const x = clientX - rect.left;
                   const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
                   setProgress(newProgress);
+                  
+                  // Seek real audio if available
+                  if (hasRealAudio && audioRef.current && audioDuration > 0) {
+                    audioRef.current.currentTime = (newProgress / 100) * audioDuration;
+                  }
                 };
                 
                 const onMouseMove = (moveEvent: MouseEvent) => {
@@ -927,6 +1070,9 @@ const PlayerModal: React.FC<PlayerProps> = ({ episode, podcast, onClose, onFinis
                   if (finalProgress >= 95) {
                     setProgress(100);
                     setPlayerState('finished');
+                    if (hasRealAudio && audioRef.current) {
+                      audioRef.current.pause();
+                    }
                     window.speechSynthesis.cancel();
                     onFinish();
                   }
@@ -1313,6 +1459,7 @@ const TippingBoard: React.FC<TippingBoardProps> = ({ podcasts, isWalletConnected
 interface ProfilePageProps {
   isWalletConnected: boolean;
   walletAddress: string;
+  fullAddress: string; // 完整地址用于 localStorage
   finishedEpisodes: string[];
   unlockedEpisodes: string[];
   mintedCollections: string[];
@@ -1321,7 +1468,8 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ 
   isWalletConnected, 
-  walletAddress, 
+  walletAddress,
+  fullAddress,
   finishedEpisodes, 
   unlockedEpisodes, 
   mintedCollections,
@@ -1332,9 +1480,33 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(userName);
   const [editBio, setEditBio] = useState(userBio);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  
+  // 从 localStorage 加载用户资料
+  useEffect(() => {
+    if (fullAddress && !profileLoaded) {
+      const storageKey = `phonograph_profile_${fullAddress.toLowerCase()}`;
+      const savedProfile = localStorage.getItem(storageKey);
+      if (savedProfile) {
+        try {
+          const profile = JSON.parse(savedProfile);
+          setUserName(profile.userName || '匿名用户');
+          setUserBio(profile.userBio || '这个人很懒，什么都没写...');
+          setEditName(profile.userName || '匿名用户');
+          setEditBio(profile.userBio || '这个人很懒，什么都没写...');
+        } catch (e) {
+          console.error('Failed to parse profile:', e);
+        }
+      }
+      setProfileLoaded(true);
+    }
+  }, [fullAddress, profileLoaded]);
   
   // 生成基于钱包地址的头像
-  const avatarUrl = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${walletAddress || 'default'}&backgroundColor=0d1117`;
+  const avatarUrl = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${fullAddress || 'default'}&backgroundColor=0d1117`;
+  
+  // 保存成功提示状态
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // 收听记录统计
   const totalListened = finishedEpisodes.length;
@@ -1350,6 +1522,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     setUserName(editName);
     setUserBio(editBio);
     setIsEditing(false);
+    
+    // 保存到 localStorage
+    if (fullAddress) {
+      const storageKey = `phonograph_profile_${fullAddress.toLowerCase()}`;
+      const profile = {
+        userName: editName,
+        userBio: editBio,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(storageKey, JSON.stringify(profile));
+      
+      // 显示保存成功提示
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }
   };
   
   if (!isWalletConnected) {
@@ -1410,13 +1597,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     className="w-full bg-black border-2 border-gray-700 focus:border-neonGreen px-4 py-2 text-white font-pixel outline-none transition-colors resize-none"
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
                   <PixelButton onClick={handleSaveProfile} variant="primary" className="px-6">
                     <CheckCircle2 size={16} /> 保存
                   </PixelButton>
                   <PixelButton onClick={() => setIsEditing(false)} variant="secondary" className="px-6">
                     取消
                   </PixelButton>
+                  {saveSuccess && (
+                    <span className="text-neonGreen font-pixel text-sm animate-pulse">
+                      ✓ 已保存到本地
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1720,10 +1912,10 @@ const App: React.FC = () => {
       )}
       
       {/* Sidebar */}
-      <aside className="w-full md:w-80 bg-void/95 border-b md:border-b-0 md:border-r border-retroGray p-6 flex flex-col sticky top-0 z-40 h-auto md:h-screen backdrop-blur-sm">
+      <aside className="w-full md:w-80 bg-void/95 border-b md:border-b-0 md:border-r border-retroGray p-6 pt-8 md:pt-10 flex flex-col sticky top-0 z-40 h-auto md:h-screen backdrop-blur-sm">
         <LogoWidget />
 
-        <nav className="flex-1 space-y-6 relative z-20 mt-4">
+        <nav className="flex-1 space-y-6 relative z-20 mt-6 md:mt-10">
           <button 
             onClick={() => { setView('discovery'); setSelectedPodcast(null); }}
             className={`group w-full text-left px-5 py-4 font-header text-lg tracking-wider border-2 transition-all duration-300 flex items-center gap-4 relative overflow-hidden ${view === 'discovery' ? 'bg-neonCyan/20 border-neonCyan text-neonCyan shadow-[0_0_25px_rgba(0,243,255,0.3)]' : 'bg-gray-900/40 border-gray-800 text-gray-500 hover:text-white hover:border-gray-600 hover:bg-gray-800'}`}
@@ -1834,6 +2026,7 @@ const App: React.FC = () => {
           <ProfilePage 
             isWalletConnected={isWalletConnected}
             walletAddress={address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ''}
+            fullAddress={address || ''}
             finishedEpisodes={finishedItems}
             unlockedEpisodes={unlockedItems}
             mintedCollections={mintedCollections}

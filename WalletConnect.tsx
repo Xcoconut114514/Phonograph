@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useConnect, useDisconnect, useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { baseSepolia } from 'wagmi/chains';
 import { Wallet, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
@@ -10,11 +10,12 @@ interface WalletModalProps {
 
 export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
   const { connectors, connect, isPending, error } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { isConnected, address } = useAccount();
+  const { disconnectAsync } = useDisconnect();
+  const { isConnected, address, connector } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -28,6 +29,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
       console.error('Connection failed:', e);
     }
     setConnectingId(null);
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      // 先断开 wagmi 连接
+      await disconnectAsync();
+      
+      // 清除 wagmi 在 localStorage 中的状态
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('wagmi') || key.startsWith('wc@') || key.includes('walletconnect'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // 关闭模态框
+      onClose();
+      
+      // 强制刷新页面以确保状态清除
+      window.location.reload();
+    } catch (e) {
+      console.error('Disconnect failed:', e);
+      // 即使出错也尝试刷新
+      window.location.reload();
+    } finally {
+      setIsDisconnecting(false);
+    }
   };
 
   const handleSwitchNetwork = () => {
@@ -118,10 +149,18 @@ export const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => 
               </div>
 
               <button
-                onClick={() => disconnect()}
-                className="w-full py-3 bg-red-500/20 border-2 border-red-500 text-red-400 font-header hover:bg-red-500/30 transition-colors"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                className="w-full py-3 bg-red-500/20 border-2 border-red-500 text-red-400 font-header hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                断开连接
+                {isDisconnecting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    断开中...
+                  </>
+                ) : (
+                  '断开连接'
+                )}
               </button>
             </div>
           ) : (
